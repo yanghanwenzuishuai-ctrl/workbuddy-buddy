@@ -1,0 +1,14 @@
+[package]
+name = "wb-buddy-hookd"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+description = "Headless daemon: prints the workbuddy-buddy display state on every change."
+
+[[bin]]
+name = "wb-buddy-hookd"
+path = "src/main.rs"
+
+[dependencies]
+wb-buddy-core = { path = "../core" }
+wb-buddy-watch = { path = "../watch" }

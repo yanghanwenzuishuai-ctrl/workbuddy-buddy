@@ -1,0 +1,11 @@
+[package]
+name = "wb-buddy-watch"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+description = "Tails the workbuddy-buddy event spool and drives the core state machine."
+
+[dependencies]
+wb-buddy-core = { path = "../core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

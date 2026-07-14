@@ -1,0 +1,8 @@
+[package]
+name = "wb-buddy-core"
+version = "0.0.1"
+edition = "2021"
+description = "Status derivation for the workbuddy-buddy desktop pet (privacy-safe, content-free)."
+license = "MIT"
+
+[dependencies]

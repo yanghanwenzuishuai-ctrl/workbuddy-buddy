@@ -1,0 +1,15 @@
+[package]
+name = "wb-buddy-bridge"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+description = "Local web bridge: tails the spool and serves the pet frontend + live state over HTTP."
+
+[[bin]]
+name = "wb-buddy-bridge"
+path = "src/main.rs"
+
+[dependencies]
+wb-buddy-core = { path = "../core" }
+wb-buddy-watch = { path = "../watch" }
+tiny_http = "0.12"
