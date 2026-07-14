@@ -19,10 +19,12 @@
            font-size: 13px; cursor: pointer; color: #333; }
   button.active { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
   body.embed .dev, body.embed .label { display: none; }        /* Tauri embeds with ?embed=1 → hide dev chrome */
+  body.embed #stage { cursor: grab; }                            /* draggable pet (data-tauri-drag-region) */
+  body.embed #stage:active { cursor: grabbing; }
 </style>
 </head>
 <body>
-  <div id="stage"><canvas id="pet" width="192" height="208"></canvas></div>
+  <div id="stage" data-tauri-drag-region><canvas id="pet" width="192" height="208" data-tauri-drag-region></canvas></div>
   <div class="label" id="lbl">idle</div>
   <div class="controls dev" id="ctrls"></div>
 <script>
