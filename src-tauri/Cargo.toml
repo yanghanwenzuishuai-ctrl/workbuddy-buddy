@@ -9,7 +9,7 @@ description = "workbuddy-buddy desktop pet — a transparent always-on-top Tauri
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api"] }
 wb-buddy-core = { path = "../crates/core" }
 wb-buddy-watch = { path = "../crates/watch" }
 
