@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Allow the pet window to receive backend state events.","local":true,"windows":["pet"],"permissions":["core:default"]}}

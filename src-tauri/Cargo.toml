@@ -1,0 +1,18 @@
+[package]
+name = "wb-buddy-app"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+description = "workbuddy-buddy desktop pet — a transparent always-on-top Tauri window."
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+wb-buddy-core = { path = "../crates/core" }
+wb-buddy-watch = { path = "../crates/watch" }
+
+[[bin]]
+name = "wb-buddy-app"
+path = "src/main.rs"

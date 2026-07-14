@@ -11,8 +11,8 @@ ecosystem.
 ## Status: v0
 
 Working end-to-end today: **WorkBuddy hook → event spool → state machine →
-live animated pet in the browser**. A native Tauri floating-window is the next
-increment (the frontend is already wired for it).
+live pet**, shown either in the browser (wb-buddy-bridge) or as a native
+transparent floating window (wb-buddy-app, Tauri v2).
 
 ## Architecture
 
@@ -64,7 +64,10 @@ python3 hooks/install.py
 # option A — browser pet: serve frontend + live state, open the printed URL
 cargo run -p wb-buddy-bridge    # → http://127.0.0.1:8787
 
-# option B — terminal: print the state on every change
+# option B — native desktop pet: transparent, always-on-top floating window
+cargo run -p wb-buddy-app       # needs a desktop session (macOS/Windows)
+
+# option C — terminal: print the state on every change
 cargo run -p wb-buddy-hookd
 ```
 
