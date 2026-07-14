@@ -56,6 +56,33 @@ pub fn default_spool() -> PathBuf {
     PathBuf::from(home).join(".workbuddy-buddy").join("events.spool")
 }
 
+/// Apply every complete (newline-terminated) line in `bytes` to `machine`, using
+/// `now` for events that omit a ts. Returns the number of bytes consumed — a
+/// trailing partial line (the hook is mid-append) is left unconsumed so it is
+/// re-read intact on the next tick. Blank / malformed / non-UTF-8 lines are skipped.
+fn consume(machine: &mut Machine, bytes: &[u8], now: u64) -> usize {
+    let Some(idx) = bytes.iter().rposition(|&b| b == b'\n') else {
+        return 0; // no complete line yet
+    };
+    let complete = &bytes[..=idx];
+    for line in complete.split(|&b| b == b'\n') {
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(text) = std::str::from_utf8(line) else { continue };
+        let text = text.trim();
+        if text.is_empty() {
+            continue;
+        }
+        if let Ok(w) = serde_json::from_str::<Wire>(text) {
+            if let Some(ev) = to_event(w, now) {
+                machine.apply(&ev);
+            }
+        }
+    }
+    complete.len()
+}
+
 /// Tail `spool` forever, calling `on_change` with the initial state and on every
 /// subsequent change (including TTL-decay transitions). Never returns.
 ///
@@ -76,26 +103,7 @@ pub fn run(spool: &Path, mut on_change: impl FnMut(State)) -> ! {
             if f.seek(SeekFrom::Start(pos)).is_ok() {
                 let mut buf = Vec::new();
                 if f.read_to_end(&mut buf).is_ok() && !buf.is_empty() {
-                    if let Some(idx) = buf.iter().rposition(|&b| b == b'\n') {
-                        let complete = &buf[..=idx];
-                        pos += complete.len() as u64;
-                        let now = now_ms();
-                        for line in complete.split(|&b| b == b'\n') {
-                            if line.is_empty() {
-                                continue;
-                            }
-                            let Ok(text) = std::str::from_utf8(line) else { continue };
-                            let text = text.trim();
-                            if text.is_empty() {
-                                continue;
-                            }
-                            if let Ok(w) = serde_json::from_str::<Wire>(text) {
-                                if let Some(ev) = to_event(w, now) {
-                                    machine.apply(&ev);
-                                }
-                            }
-                        }
-                    }
+                    pos += consume(&mut machine, &buf, now_ms()) as u64;
                 }
             }
         }
@@ -148,5 +156,47 @@ mod tests {
     fn stop_defaults_question_false() {
         let e = to_event(wire(r#"{"event":"Stop"}"#), 0).unwrap();
         assert!(matches!(e.kind, HookKind::Stop { ends_with_question: false }));
+    }
+
+    // ---- consume() : the spool-tail robustness fixes -----------------------
+    #[test]
+    fn consume_applies_complete_lines_and_leaves_partial() {
+        let mut m = Machine::new();
+        let bytes = b"{\"event\":\"UserPromptSubmit\",\"session_id\":\"s\",\"ts\":1}\n\
+                      {\"event\":\"Stop\",\"session_id\":\"s\",\"ts\":2}\n\
+                      {\"event\":\"parti";
+        let consumed = consume(&mut m, bytes, 1000);
+        assert!(consumed < bytes.len(), "trailing partial line must not be consumed");
+        assert_eq!(m.display_state(2), State::Done); // both complete lines applied
+    }
+
+    #[test]
+    fn consume_returns_zero_without_a_newline() {
+        let mut m = Machine::new();
+        assert_eq!(consume(&mut m, b"{\"event\":\"UserPromptSubmit\"}", 1000), 0);
+        assert_eq!(m.display_state(1000), State::Idle); // nothing applied yet
+    }
+
+    #[test]
+    fn partial_line_completes_on_the_next_tick() {
+        // The exact defect the fix targets: one JSONL line split across two reads
+        // must not be lost or corrupted.
+        let mut m = Machine::new();
+        let t1 = b"{\"event\":\"UserPromptSubmit\",\"session_id\":\"s\",\"ts\":1}\n{\"event\":\"St";
+        let c1 = consume(&mut m, t1, 10);
+        assert_eq!(m.display_state(10), State::Working);
+        // run() advances pos by c1, so the next read re-includes the un-consumed bytes:
+        let mut t2 = t1[c1..].to_vec();
+        t2.extend_from_slice(b"op\",\"session_id\":\"s\",\"ts\":2}\n");
+        consume(&mut m, &t2, 20);
+        assert_eq!(m.display_state(20), State::Done); // event survived the split
+    }
+
+    #[test]
+    fn consume_skips_blank_and_malformed_lines() {
+        let mut m = Machine::new();
+        let bytes = b"\n  \nnot json at all\n{\"event\":\"PermissionRequest\",\"session_id\":\"s\",\"ts\":1}\n";
+        consume(&mut m, bytes, 1000);
+        assert_eq!(m.display_state(1), State::Waiting); // only the one valid line applied
     }
 }
