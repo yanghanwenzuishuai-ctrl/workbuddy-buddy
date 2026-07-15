@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Allow the pet window to receive backend state events.",
   "windows": ["pet"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
 }

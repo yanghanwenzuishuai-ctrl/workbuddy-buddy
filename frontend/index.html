@@ -24,7 +24,7 @@
 </style>
 </head>
 <body>
-  <div id="stage" data-tauri-drag-region><canvas id="pet" width="192" height="208" data-tauri-drag-region></canvas></div>
+  <div id="stage"><canvas id="pet" width="192" height="208"></canvas></div>
   <div class="label" id="lbl">idle</div>
   <div class="controls dev" id="ctrls"></div>
 <script>
@@ -149,6 +149,17 @@ if (new URLSearchParams(location.search).has("embed")) document.body.classList.a
 if (window.__TAURI__ && window.__TAURI__.event) {
   // Tauri host: subscribe to backend-pushed state events.
   window.__TAURI__.event.listen("pet-state", e => setState((e.payload || "").toString().trim()));
+  // Drag the borderless window by grabbing the pet. data-tauri-drag-region is
+  // unreliable over a <canvas>, so start the OS drag programmatically on mousedown.
+  try {
+    const w = window.__TAURI__.window;
+    const appWin = w && (w.getCurrentWindow || w.getCurrent) ? (w.getCurrentWindow || w.getCurrent).call(w) : null;
+    if (appWin) {
+      document.getElementById("stage").addEventListener("mousedown", (e) => {
+        if (e.button === 0) { try { appWin.startDragging(); } catch (_) {} }
+      });
+    }
+  } catch (_) { /* drag unavailable → pet still renders */ }
 } else {
   // Web host (wb-buddy-bridge): poll the /state endpoint. Errors are ignored so
   // a standalone open (file://, no bridge) still works via the dev controls.
