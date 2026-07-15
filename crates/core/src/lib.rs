@@ -159,13 +159,18 @@ fn effective(entry: &SessionEntry, now: u64) -> State {
 }
 
 /// WorkBuddy has no public error-marker; we heuristically read notification kind.
-/// Case-insensitive. Informational notifications return None so they don't
-/// override the live state.
+/// Case-insensitive. Informational notifications (e.g. `auth_success`) return
+/// None so they don't override the live state.
+///
+/// `idle`/`idle_prompt` → Waiting: WorkBuddy fires this when the agent finishes
+/// and is idle waiting for the user, so the pet shows "your turn" (observed live).
 fn classify_notification(kind: Option<&str>) -> Option<State> {
     let k = kind?.to_lowercase();
     if k.contains("error") || k.contains("fail") {
         Some(State::Failed)
-    } else if k.contains("permission") || k.contains("approval") || k.contains("input") {
+    } else if k.contains("permission") || k.contains("approval") || k.contains("input")
+        || k.contains("idle")
+    {
         Some(State::Waiting)
     } else {
         None
@@ -245,6 +250,15 @@ mod tests {
     fn notification_permission_kind_yields_waiting() {
         let mut m = Machine::new();
         m.apply(&ev("s1", 0, HookKind::Notification { kind: Some("approval_required".into()) }));
+        assert_eq!(m.display_state(0), State::Waiting);
+    }
+
+    #[test]
+    fn notification_idle_prompt_yields_waiting() {
+        // WorkBuddy fires notification_type=idle_prompt when the agent finishes
+        // and awaits the user → pet should show "your turn" (waiting). (observed live)
+        let mut m = Machine::new();
+        m.apply(&ev("s1", 0, HookKind::Notification { kind: Some("idle_prompt".into()) }));
         assert_eq!(m.display_state(0), State::Waiting);
     }
 
