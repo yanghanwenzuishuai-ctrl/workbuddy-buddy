@@ -92,6 +92,10 @@ pub fn start(app: AppHandle) {
                     let _ = req.respond(resp);
                 };
 
+                if method == Method::Get && path.starts_with("/userpet/") {
+                    serve_userpet(&path, req);
+                    return;
+                }
                 match (method, path.as_str()) {
                     (Method::Options, _) => respond(req, 204, ""),
                     (Method::Post, "/approve") => {
@@ -138,6 +142,30 @@ pub fn start(app: AppHandle) {
             });
         }
     });
+}
+
+/// Serve a user-supplied pet pack from ~/.workbuddy-buddy/pet/ (pet.json,
+/// spritesheet.png, ...). Lets people drop in their own pet without a rebuild.
+fn serve_userpet(path: &str, req: tiny_http::Request) {
+    let rel = &path["/userpet/".len()..];
+    if rel.is_empty() || rel.split('/').any(|c| c == "..") {
+        let _ = req.respond(cors(Response::from_string("bad path").with_status_code(400)));
+        return;
+    }
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let file = std::path::Path::new(&home).join(".workbuddy-buddy").join("pet").join(rel);
+    match std::fs::read(&file) {
+        Ok(bytes) => {
+            let ct = if rel.ends_with(".json") { "application/json; charset=utf-8" }
+                     else if rel.ends_with(".png") { "image/png" }
+                     else if rel.ends_with(".webp") { "image/webp" }
+                     else { "application/octet-stream" };
+            let resp = cors(Response::from_data(bytes)
+                .with_header(Header::from_bytes("Content-Type", ct).unwrap()));
+            let _ = req.respond(resp);
+        }
+        Err(_) => { let _ = req.respond(cors(Response::from_string("not found").with_status_code(404))); }
+    }
 }
 
 #[cfg(test)]

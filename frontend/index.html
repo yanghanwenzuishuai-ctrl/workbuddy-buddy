@@ -66,7 +66,7 @@
   <div class="label" id="lbl">idle</div>
   <div class="controls dev" id="ctrls"></div>
 <script>
-const STATES = ["idle", "working", "waiting", "done", "failed"];
+const STATES = ["idle", "thinking", "working", "review", "waiting", "done", "failed"];
 const canvas = document.getElementById("pet");
 const ctx = canvas.getContext("2d");
 
@@ -101,8 +101,21 @@ function renderError(err) {
   ctx.fillText("!", W / 2, H / 2 + 7);
 }
 
+// Prefer a user-supplied pet (~/.workbuddy-buddy/pet/, served by the app on
+// :8792) so open-source users can drop in their own without rebuilding; else
+// fall back to the built-in reference pet.
+async function petBase() {
+  if (window.__TAURI__) {
+    try {
+      const r = await fetch("http://127.0.0.1:8792/userpet/pet.json", { cache: "no-store" });
+      if (r.ok) return "http://127.0.0.1:8792/userpet/";
+    } catch (_) {}
+  }
+  return "pet/";
+}
+
 async function load() {
-  const base = "pet/";
+  const base = await petBase();
   try {
     const r = await fetch(base + "pet.json");
     if (!r.ok) throw new Error("pet.json HTTP " + r.status);
