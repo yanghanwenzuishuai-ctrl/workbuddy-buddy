@@ -42,6 +42,17 @@ Crates:
 - **frontend/** — canvas sprite renderer; loads `pet.json` + spritesheet, animates
   the row for the current state. Self-made placeholder art (`assets/gen_sprite.py`).
 
+## Approval UI (the pet as a permission gate)
+
+When WorkBuddy is about to run a gated tool (default: `Bash`) or shows a native
+permission prompt, the pet pops a bubble with **允许 / 拒绝**. Your click is
+returned to WorkBuddy as a hook decision (verified honored live — deny reasons
+are fed back to the agent, in every permission mode including dontAsk).
+**Fail-open by design**: if the pet isn't running or you don't click within
+50s, the hook stays silent and WorkBuddy behaves exactly as if the pet did not
+exist. Approval details (tool name + truncated command) travel over loopback
+for display only and are never persisted.
+
 ## Privacy contract
 
 The pet reads **event shape only** — event name, timestamp, session id, tool

@@ -7,6 +7,8 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod approval;
+
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
@@ -18,6 +20,7 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             build_tray(app)?;
+            approval::start(app.handle().clone());
 
             // Tail the spool on a background thread; push every state change to the pet window.
             let handle = app.handle().clone();

@@ -6,7 +6,7 @@
 <title>workbuddy-buddy</title>
 <style>
   :root { --bg: transparent; }
-  html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
+  html, body { margin: 0; height: 100%; position: relative; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
   body { display: flex; flex-direction: column; align-items: center; justify-content: center;
          background: var(--bg); gap: 14px; -webkit-user-select: none; user-select: none; }
   #stage { width: 288px; height: 312px; display: flex; align-items: center; justify-content: center; }
@@ -19,11 +19,29 @@
            font-size: 13px; cursor: pointer; color: #333; }
   button.active { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
   body.embed .dev, body.embed .label { display: none; }        /* Tauri embeds with ?embed=1 → hide dev chrome */
+  /* approval bubble (two-way permission UI) */
+  #approval { display: none; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    background: #fff; border: 1px solid #d9def0; border-radius: 12px; padding: 10px 12px;
+    box-shadow: 0 8px 24px rgba(30,40,90,.18); width: 250px; z-index: 10; }
+  #approval.show { display: block; }
+  #approval .atitle { font-size: 12px; font-weight: 600; color: #333; margin-bottom: 4px; }
+  #approval .adetail { font-size: 11px; color: #667; font-family: ui-monospace, Menlo, monospace;
+    word-break: break-all; max-height: 48px; overflow: hidden; margin-bottom: 8px; }
+  #approval .arow { display: flex; gap: 8px; align-items: center; }
+  #approval button { flex: 1; padding: 6px 0; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  #approval .allow { background: #6fcf77; border: 1px solid #57b25f; color: #fff; }
+  #approval .deny { background: #fff; border: 1px solid #eb5757; color: #eb5757; }
+  #approval .count { font-size: 11px; color: #99a; min-width: 24px; text-align: right; }
   body.embed #stage { cursor: grab; }                            /* draggable pet (data-tauri-drag-region) */
   body.embed #stage:active { cursor: grabbing; }
 </style>
 </head>
 <body>
+  <div id="approval">
+    <div class="atitle"></div>
+    <div class="adetail"></div>
+    <div class="arow"><button class="allow">允许</button><button class="deny">拒绝</button><span class="count"></span></div>
+  </div>
   <div id="stage"><canvas id="pet" width="192" height="208"></canvas></div>
   <div class="label" id="lbl">idle</div>
   <div class="controls dev" id="ctrls"></div>
@@ -149,6 +167,49 @@ if (new URLSearchParams(location.search).has("embed")) document.body.classList.a
 if (window.__TAURI__ && window.__TAURI__.event) {
   // Tauri host: subscribe to backend-pushed state events.
   window.__TAURI__.event.listen("pet-state", e => setState((e.payload || "").toString().trim()));
+  // ---- approval bubble (two-way permission UI) ----
+  const approvalQ = [];
+  let approvalCur = null, approvalTimer = null;
+  const $a = document.getElementById("approval");
+  function renderApproval() {
+    if (approvalCur || approvalQ.length === 0) return;
+    approvalCur = approvalQ.shift();
+    $a.querySelector(".atitle").textContent = "WorkBuddy 请求: " + approvalCur.tool_name;
+    $a.querySelector(".adetail").textContent = approvalCur.detail || "";
+    let left = Math.max(5, (approvalCur.seconds || 50) - 2);
+    const cnt = $a.querySelector(".count");
+    cnt.textContent = left + "s";
+    approvalTimer = setInterval(() => {
+      left -= 1; cnt.textContent = left + "s";
+      if (left <= 0) dismissApproval();       // server resolves as timeout
+    }, 1000);
+    $a.classList.add("show");
+    setState("waiting");
+  }
+  function dismissApproval() {
+    if (approvalTimer) { clearInterval(approvalTimer); approvalTimer = null; }
+    $a.classList.remove("show");
+    approvalCur = null;
+    renderApproval();
+  }
+  function decideApproval(decision) {
+    if (!approvalCur) return;
+    window.__TAURI__.event.emit("pet-decision", { id: approvalCur.id, decision });
+    dismissApproval();
+  }
+  $a.querySelector(".allow").addEventListener("click", () => decideApproval("allow"));
+  $a.querySelector(".deny").addEventListener("click", () => decideApproval("deny"));
+  window.__TAURI__.event.listen("pet-approval", e => {
+    const p = e.payload || {};
+    approvalQ.push(p);
+    renderApproval();
+  });
+  window.__TAURI__.event.listen("pet-approval-done", e => {
+    const id = (e.payload || {}).id;
+    if (approvalCur && approvalCur.id === id) dismissApproval();
+    else { const i = approvalQ.findIndex(x => x.id === id); if (i >= 0) approvalQ.splice(i, 1); }
+  });
+
   // Drag the borderless window by grabbing the pet. data-tauri-drag-region is
   // unreliable over a <canvas>, so start the OS drag programmatically on mousedown.
   try {

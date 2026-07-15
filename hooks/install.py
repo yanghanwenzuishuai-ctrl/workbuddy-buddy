@@ -1,56 +1,69 @@
-"""Register the workbuddy-buddy hook into ~/.workbuddy/settings.json.
+"""Register workbuddy-buddy hooks into ~/.workbuddy/settings.json.
 
-Idempotent and non-destructive:
-  * backs up the *pristine* settings.json once (never overwrites the backup);
-  * for each event, removes only OUR prior entries (this hook or the W0 probe)
-    and appends a fresh one — any other user-configured hook is preserved;
-  * writes atomically (temp file + os.replace) so an interrupted run can't
-    corrupt settings.json.
-Requires a WorkBuddy restart to take effect. Undo: restore the .wb-buddy-bak backup.
+Two hook sets:
+  * status hooks  — wb-buddy-hook.sh on 7 lifecycle events (drives the pet's state)
+  * approval hook — wb-buddy-approve.sh gates Bash via PreToolUse and any native
+    permission prompt via PermissionRequest; the pet's bubble decides (fail-open)
+
+Idempotent and non-destructive: backs up pristine settings once, removes only
+OUR previous entries (incl. any W0 probe), preserves user hooks, writes
+atomically. Requires a WorkBuddy restart to take effect.
 """
 import json, os, shutil, tempfile
 
-HOOK = os.path.abspath(os.path.join(os.path.dirname(__file__), "wb-buddy-hook.sh"))
+HERE = os.path.dirname(os.path.abspath(__file__))
+STATUS = os.path.join(HERE, "wb-buddy-hook.sh")
+APPROVE = os.path.join(HERE, "wb-buddy-approve.sh")
 settings = os.path.expanduser("~/.workbuddy/settings.json")
-EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
-          "PermissionRequest", "Notification", "Stop"]
+STATUS_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+                 "PermissionRequest", "Notification", "Stop"]
 
 def is_ours(cmd):
-    return isinstance(cmd, str) and ("wb-buddy-hook.sh" in cmd or ".workbuddy-buddy-w0" in cmd)
+    return isinstance(cmd, str) and ("wb-buddy-hook.sh" in cmd or "wb-buddy-approve.sh" in cmd
+                                     or ".workbuddy-buddy-w0" in cmd)
 
 def group_is_ours(g):
     return isinstance(g, dict) and any(
         is_ours(h.get("command")) for h in g.get("hooks", []) if isinstance(h, dict))
 
 d = json.load(open(settings)) if os.path.exists(settings) else {}
-
 bak = settings + ".wb-buddy-bak"
 if os.path.exists(settings) and not os.path.exists(bak):
-    shutil.copy2(settings, bak)   # pristine backup, once
+    shutil.copy2(settings, bak)
 
 hooks = d.get("hooks", {})
-for ev in EVENTS:
-    kept = [g for g in hooks.get(ev, []) if isinstance(g, dict) and not group_is_ours(g)]
-    entry = {"hooks": [{"type": "command", "command": f"{HOOK} {ev}"}]}
+
+# strip all of our previous groups everywhere (also removes W0 probes)
+for ev in list(hooks):
+    hooks[ev] = [g for g in hooks.get(ev, []) if isinstance(g, dict) and not group_is_ours(g)]
+
+# status hooks
+for ev in STATUS_EVENTS:
+    entry = {"hooks": [{"type": "command", "command": f"{STATUS} {ev}"}]}
     if ev in ("PreToolUse", "PostToolUse"):
         entry = {"matcher": ".*", **entry}
-    kept.append(entry)
-    hooks[ev] = kept
-d["hooks"] = hooks
+    hooks.setdefault(ev, []).append(entry)
 
+# approval hooks (blocking; generous timeout > pet's 50s decision window)
+hooks.setdefault("PreToolUse", []).append(
+    {"matcher": "Bash", "hooks": [{"type": "command", "command": f"{APPROVE} PreToolUse", "timeout": 90}]})
+hooks.setdefault("PermissionRequest", []).append(
+    {"hooks": [{"type": "command", "command": f"{APPROVE} PermissionRequest", "timeout": 90}]})
+
+d["hooks"] = hooks
 fd, tmp = tempfile.mkstemp(dir=os.path.dirname(settings), prefix=".settings.", suffix=".tmp")
 try:
     with os.fdopen(fd, "w") as f:
         json.dump(d, f, indent=2, ensure_ascii=False)
         f.flush(); os.fsync(f.fileno())
-    os.replace(tmp, settings)  # atomic
+    os.replace(tmp, settings)
 except Exception:
     if os.path.exists(tmp):
         os.remove(tmp)
     raise
 
-print(f"registered wb-buddy hooks: {EVENTS}")
-print(f"  settings : {settings}")
-print(f"  backup   : {bak}  (pristine, kept)")
-print(f"  hook     : {HOOK}")
+print("registered:")
+print(f"  status  : {STATUS_EVENTS}")
+print(f"  approval: PreToolUse[Bash] + PermissionRequest (fail-open, 50s bubble)")
+print(f"  backup  : {bak}")
 print("Restart WorkBuddy for hooks to load.")
