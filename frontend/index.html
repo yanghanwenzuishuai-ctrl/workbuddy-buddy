@@ -6,41 +6,61 @@
 <title>workbuddy-buddy</title>
 <style>
   :root { --bg: transparent; }
-  html, body { margin: 0; height: 100%; position: relative; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
+  html, body { margin: 0; height: 100%; position: relative;
+    font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
   body { display: flex; flex-direction: column; align-items: center; justify-content: center;
-         background: var(--bg); gap: 14px; -webkit-user-select: none; user-select: none; }
-  #stage { width: 288px; height: 312px; display: flex; align-items: center; justify-content: center; }
-  /* pixel-art: crisp nearest-neighbour upscale instead of blur */
-  canvas { image-rendering: pixelated; image-rendering: crisp-edges;
+         background: var(--bg); gap: 12px; -webkit-user-select: none; user-select: none;
+         overflow: hidden; }
+  #stage { display: flex; align-items: center; justify-content: center; }
+  /* responsive pet: never wider than the window */
+  canvas { width: min(288px, calc(100vw - 24px)); height: auto;
+           image-rendering: pixelated; image-rendering: crisp-edges;
            filter: drop-shadow(0 6px 8px rgba(0,0,0,.15)); }
   .label { font-size: 12px; color: #7a8296; letter-spacing: .1em; text-transform: uppercase; }
   .controls { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 340px; }
-  button { border: 1px solid #cdd3e0; background: #fff; border-radius: 8px; padding: 6px 11px;
-           font-size: 13px; cursor: pointer; color: #333; }
-  button.active { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
-  body.embed .dev, body.embed .label { display: none; }        /* Tauri embeds with ?embed=1 → hide dev chrome */
-  /* approval bubble (two-way permission UI) */
-  #approval { display: none; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
-    background: #fff; border: 1px solid #d9def0; border-radius: 12px; padding: 10px 12px;
-    box-shadow: 0 8px 24px rgba(30,40,90,.18); width: 250px; z-index: 10; }
-  #approval.show { display: block; }
-  #approval .atitle { font-size: 12px; font-weight: 600; color: #333; margin-bottom: 4px; }
-  #approval .adetail { font-size: 11px; color: #667; font-family: ui-monospace, Menlo, monospace;
-    word-break: break-all; max-height: 48px; overflow: hidden; margin-bottom: 8px; }
-  #approval .arow { display: flex; gap: 8px; align-items: center; }
-  #approval button { flex: 1; padding: 6px 0; border-radius: 8px; font-size: 13px; cursor: pointer; }
-  #approval .allow { background: #6fcf77; border: 1px solid #57b25f; color: #fff; }
-  #approval .deny { background: #fff; border: 1px solid #eb5757; color: #eb5757; }
-  #approval .count { font-size: 11px; color: #99a; min-width: 24px; text-align: right; }
-  body.embed #stage { cursor: grab; }                            /* draggable pet (data-tauri-drag-region) */
+  .controls button { border: 1px solid #cdd3e0; background: #fff; border-radius: 8px;
+           padding: 6px 11px; font-size: 13px; cursor: pointer; color: #333; }
+  .controls button.active { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
+  body.embed .dev, body.embed .label { display: none; }
+  body.embed #stage { cursor: grab; }
   body.embed #stage:active { cursor: grabbing; }
+
+  /* ---- approval bubble (two-way permission UI) ---- */
+  #approval { display: none; position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    width: calc(100vw - 20px); max-width: 300px; box-sizing: border-box;
+    background: rgba(255,255,255,.98); border: 1px solid #e3e7f3; border-radius: 14px;
+    padding: 12px; box-shadow: 0 10px 30px rgba(30,40,90,.22); z-index: 10; }
+  #approval.show { display: block; animation: pop .18s ease-out; }
+  @keyframes pop { from { transform: translateX(-50%) scale(.92); opacity: 0; }
+                   to   { transform: translateX(-50%) scale(1);   opacity: 1; } }
+  #approval .ahead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  #approval .adot { width: 8px; height: 8px; border-radius: 50%; background: #b57ed4; flex: none;
+    animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  #approval .atitle { font-size: 12px; font-weight: 700; color: #2b3350; flex: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #approval .count { font-size: 11px; color: #9aa1b8; font-variant-numeric: tabular-nums; flex: none; }
+  #approval .atool { display: inline-block; font-size: 11px; font-weight: 600; color: #6a4d94;
+    background: #f1e9fb; border-radius: 6px; padding: 1px 8px; margin-bottom: 6px; }
+  #approval .adetail { font-size: 11px; line-height: 1.45; color: #56607a;
+    font-family: ui-monospace, Menlo, monospace; background: #f6f7fb; border-radius: 8px;
+    padding: 6px 8px; margin-bottom: 10px; word-break: break-all;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  #approval .adetail:empty { display: none; }
+  #approval .arow { display: flex; gap: 8px; }
+  #approval .arow button { flex: 1; padding: 8px 0; border-radius: 9px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: filter .1s; }
+  #approval .arow button:hover { filter: brightness(.95); }
+  #approval .allow { background: #57b25f; border: 1px solid #4a9b52; color: #fff; }
+  #approval .deny  { background: #fff; border: 1px solid #eb5757; color: #eb5757; }
 </style>
 </head>
 <body>
   <div id="approval">
-    <div class="atitle"></div>
+    <div class="ahead"><span class="adot"></span><span class="atitle">WorkBuddy 权限请求</span><span class="count"></span></div>
+    <span class="atool"></span>
     <div class="adetail"></div>
-    <div class="arow"><button class="allow">允许</button><button class="deny">拒绝</button><span class="count"></span></div>
+    <div class="arow"><button class="allow">允许</button><button class="deny">拒绝</button></div>
   </div>
   <div id="stage"><canvas id="pet" width="192" height="208"></canvas></div>
   <div class="label" id="lbl">idle</div>
@@ -49,7 +69,6 @@
 const STATES = ["idle", "working", "waiting", "done", "failed"];
 const canvas = document.getElementById("pet");
 const ctx = canvas.getContext("2d");
-canvas.style.width = "288px"; canvas.style.height = "312px";   // display at 1.5x
 
 let pet = null, sheet = null, cur = "idle", frameIdx = 0, acc = 0, lastT = 0;
 let ready = false, pendingState = null;
@@ -92,7 +111,7 @@ async function load() {
     canvas.width = pet.frame.width;
     canvas.height = pet.frame.height;
     await loadSheet(base + pet.spritesheetPath);
-    ctx.imageSmoothingEnabled = false;            // crisp pixels on upscale
+    ctx.imageSmoothingEnabled = false;
     buildControls();
     ready = true;
     window.dispatchEvent(new CustomEvent("wbBuddy-ready"));
@@ -115,7 +134,7 @@ function loop(t) {
   while (acc >= spf) {
     acc -= spf;
     frameIdx = (frameIdx + 1) % a.frames.length;
-    if (!a.loop && frameIdx === 0) frameIdx = a.frames.length - 1;   // clamp one-shot
+    if (!a.loop && frameIdx === 0) frameIdx = a.frames.length - 1;
   }
   draw(a);
   requestAnimationFrame(loop);
@@ -131,7 +150,7 @@ function draw(a) {
 
 function setState(s) {
   if (!STATES.includes(s)) return;
-  if (!ready) { pendingState = s; return; }        // buffer until sprite loaded
+  if (!ready) { pendingState = s; return; }
   cur = s; frameIdx = 0; acc = 0;
   document.getElementById("lbl").textContent = s;
   [...document.querySelectorAll("#ctrls button")].forEach(b =>
@@ -158,60 +177,57 @@ function runDemo() {
   demoTimer = setInterval(() => { i = (i + 1) % seq.length; setState(seq[i]); }, 1400);
 }
 
+// ---- approval bubble (two-way permission UI) ----
+// UI works in any host; the decision is only *delivered* under Tauri.
+const approvalQ = [];
+let approvalCur = null, approvalTimer = null;
+const $a = document.getElementById("approval");
+function renderApproval() {
+  if (approvalCur || approvalQ.length === 0) return;
+  approvalCur = approvalQ.shift();
+  $a.querySelector(".atool").textContent = approvalCur.tool_name || "?";
+  $a.querySelector(".adetail").textContent = approvalCur.detail || "";
+  let left = Math.max(5, (approvalCur.seconds || 50) - 2);
+  const cnt = $a.querySelector(".count");
+  cnt.textContent = left + "s";
+  approvalTimer = setInterval(() => {
+    left -= 1; cnt.textContent = left + "s";
+    if (left <= 0) dismissApproval();          // server resolves as timeout
+  }, 1000);
+  $a.classList.add("show");
+  setState("waiting");
+}
+function dismissApproval() {
+  if (approvalTimer) { clearInterval(approvalTimer); approvalTimer = null; }
+  $a.classList.remove("show");
+  approvalCur = null;
+  renderApproval();
+}
+function decideApproval(decision) {
+  if (!approvalCur) return;
+  if (window.__TAURI__ && window.__TAURI__.event)
+    window.__TAURI__.event.emit("pet-decision", { id: approvalCur.id, decision });
+  dismissApproval();
+}
+$a.querySelector(".allow").addEventListener("click", () => decideApproval("allow"));
+$a.querySelector(".deny").addEventListener("click", () => decideApproval("deny"));
+
 // ---- state source contract ----
-// Tauri backend pushes a `pet-state` event; a plain web host streams via SSE.
-window.wbBuddy = { setState, getState: () => cur, isReady: () => ready };
+window.wbBuddy = {
+  setState, getState: () => cur, isReady: () => ready,
+  _testApproval: p => { approvalQ.push(p || { id: 0, tool_name: "Bash", detail: "ls -la", seconds: 50 }); renderApproval(); },
+};
 
 if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
 
 if (window.__TAURI__ && window.__TAURI__.event) {
-  // Tauri host: subscribe to backend-pushed state events.
   window.__TAURI__.event.listen("pet-state", e => setState((e.payload || "").toString().trim()));
-  // ---- approval bubble (two-way permission UI) ----
-  const approvalQ = [];
-  let approvalCur = null, approvalTimer = null;
-  const $a = document.getElementById("approval");
-  function renderApproval() {
-    if (approvalCur || approvalQ.length === 0) return;
-    approvalCur = approvalQ.shift();
-    $a.querySelector(".atitle").textContent = "WorkBuddy 请求: " + approvalCur.tool_name;
-    $a.querySelector(".adetail").textContent = approvalCur.detail || "";
-    let left = Math.max(5, (approvalCur.seconds || 50) - 2);
-    const cnt = $a.querySelector(".count");
-    cnt.textContent = left + "s";
-    approvalTimer = setInterval(() => {
-      left -= 1; cnt.textContent = left + "s";
-      if (left <= 0) dismissApproval();       // server resolves as timeout
-    }, 1000);
-    $a.classList.add("show");
-    setState("waiting");
-  }
-  function dismissApproval() {
-    if (approvalTimer) { clearInterval(approvalTimer); approvalTimer = null; }
-    $a.classList.remove("show");
-    approvalCur = null;
-    renderApproval();
-  }
-  function decideApproval(decision) {
-    if (!approvalCur) return;
-    window.__TAURI__.event.emit("pet-decision", { id: approvalCur.id, decision });
-    dismissApproval();
-  }
-  $a.querySelector(".allow").addEventListener("click", () => decideApproval("allow"));
-  $a.querySelector(".deny").addEventListener("click", () => decideApproval("deny"));
-  window.__TAURI__.event.listen("pet-approval", e => {
-    const p = e.payload || {};
-    approvalQ.push(p);
-    renderApproval();
-  });
+  window.__TAURI__.event.listen("pet-approval", e => { approvalQ.push(e.payload || {}); renderApproval(); });
   window.__TAURI__.event.listen("pet-approval-done", e => {
     const id = (e.payload || {}).id;
     if (approvalCur && approvalCur.id === id) dismissApproval();
     else { const i = approvalQ.findIndex(x => x.id === id); if (i >= 0) approvalQ.splice(i, 1); }
   });
-
-  // Drag the borderless window by grabbing the pet. data-tauri-drag-region is
-  // unreliable over a <canvas>, so start the OS drag programmatically on mousedown.
   try {
     const w = window.__TAURI__.window;
     const appWin = w && (w.getCurrentWindow || w.getCurrent) ? (w.getCurrentWindow || w.getCurrent).call(w) : null;
@@ -222,8 +238,6 @@ if (window.__TAURI__ && window.__TAURI__.event) {
     }
   } catch (_) { /* drag unavailable → pet still renders */ }
 } else {
-  // Web host (wb-buddy-bridge): poll the /state endpoint. Errors are ignored so
-  // a standalone open (file://, no bridge) still works via the dev controls.
   const poll = async () => {
     try { const r = await fetch("/state", { cache: "no-store" }); if (r.ok) setState((await r.text()).trim()); }
     catch (e) { /* no bridge → dev controls still work */ }

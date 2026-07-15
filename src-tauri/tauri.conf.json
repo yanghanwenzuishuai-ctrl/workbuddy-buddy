@@ -14,8 +14,8 @@
         "label": "pet",
         "url": "index.html?embed=1",
         "title": "workbuddy-buddy",
-        "width": 220,
-        "height": 260,
+        "width": 320,
+        "height": 420,
         "transparent": true,
         "decorations": false,
         "alwaysOnTop": true,
@@ -31,6 +31,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.png"]
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.png"
+    ]
   }
 }
