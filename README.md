@@ -31,10 +31,21 @@ Codex Pets ecosystem.
 
 ## Quick start
 
-Requirements: Rust (stable) and Python 3. macOS for the desktop app.
+**One line** — macOS, needs [Rust](https://rustup.rs) (the installer tells you if it's missing):
 
 ```sh
-git clone <this repo> && cd workbuddy-buddy
+curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install.sh | bash
+```
+
+It fetches the source, builds the pet, installs the WorkBuddy hook (backing up
+your `settings.json`), and launches it. Then **fully restart WorkBuddy** (Cmd+Q,
+its config is cached at startup), open a folder, and run a task.
+
+<details>
+<summary>Or step by step</summary>
+
+```sh
+git clone https://github.com/FlashFamily/workbuddy-buddy && cd workbuddy-buddy
 cargo test                      # state logic
 python3 hooks/test_privacy.py   # privacy contract
 
@@ -45,6 +56,7 @@ python3 hooks/install.py
 cargo run -p wb-buddy-bridge    # browser pet  → http://127.0.0.1:8787
 cargo run -p wb-buddy-app       # native transparent floating window (macOS)
 ```
+</details>
 
 To get a proper `.app` (Dock icon, app name) install the Tauri CLI and bundle:
 
