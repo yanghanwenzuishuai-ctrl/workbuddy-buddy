@@ -1,0 +1,110 @@
+{
+  "pets": [
+    {
+      "id": "bloop",
+      "displayName": "Bloop",
+      "description": "A buoyant blue axolotl with coral gills and a tiny backpack full of debugging supplies.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "buzz-bit",
+      "displayName": "Buzz Bit",
+      "description": "A bright bumblebee with crisp little wings, a micro-backpack, and tireless focus.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "comet-lop",
+      "displayName": "Comet Lop",
+      "description": "A moon-white lop-eared rabbit with a crescent clasp and an imaginative streak.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "gizmo-kernel",
+      "displayName": "Gizmo Kernel",
+      "description": "A resourceful honey-gold hamster with quick paws and a tiny utility belt.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "kiki-koala",
+      "displayName": "Kiki Koala",
+      "description": "A thoughtful silver koala with round ears, a utility pouch, and a gentle focus.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "momo-mug",
+      "displayName": "Momo Mug",
+      "description": "A calm capybara with a navy neckerchief and a tiny mug charm for long coding sessions.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "moss-shell",
+      "displayName": "Moss Shell",
+      "description": "A patient moss-green tortoise with an amber shell and a practical leaf badge.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "nimbus-noodle",
+      "displayName": "Nimbus Noodle",
+      "description": "A soft cloud dragon that floats through tasks, sparks ideas, and celebrates every clean finish.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "nori-nibble",
+      "displayName": "Nori Nibble",
+      "description": "A cozy red panda in a navy hoodie with a bold striped tail and curious nature.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "olli-orbit",
+      "displayName": "Olli Orbit",
+      "description": "A scholarly round owl whose square glasses and sharp eyes make every review count.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "pico-patch",
+      "displayName": "Pico Patch",
+      "description": "A quick-witted fennec fox with oversized ears, a utility bandana, and a talent for shipping fixes.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "pogo-ping",
+      "displayName": "Pogo Ping",
+      "description": "A precise little penguin with a teal bow tie and cheerful desk-side energy.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "rumi-relay",
+      "displayName": "Rumi Relay",
+      "description": "A nimble raccoon in a utility vest with a striped tail and a talent for quick fixes.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "sora-shiba",
+      "displayName": "Sora Shiba",
+      "description": "An alert golden Shiba with a curled tail, bright tag, and optimistic working spirit.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "taro-tinker",
+      "displayName": "Taro Tinker",
+      "description": "A sturdy little pangolin with an armored tail, a tool belt, and endless patience for hard problems.",
+      "author": "John (with Codex)",
+      "license": "CC-BY-4.0"
+    }
+  ],
+  "default": "sora-shiba"
+}

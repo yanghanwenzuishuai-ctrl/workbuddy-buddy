@@ -40,15 +40,23 @@ fn main() {
 /// Build the menu-bar tray. The borderless pet window has no title bar, so the
 /// tray is the only way to hide or quit it.
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    let buddy = MenuItem::with_id(app, "buddy", "选择伙伴 / Choose buddy…", true, None::<&str>)?;
     let toggle = MenuItem::with_id(app, "toggle", "Show / hide pet", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit workbuddy-buddy", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&toggle, &PredefinedMenuItem::separator(app)?, &quit])?;
+    let menu = Menu::with_items(app, &[&buddy, &toggle, &PredefinedMenuItem::separator(app)?, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id("wb-buddy-tray")
         .tooltip("workbuddy-buddy")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "buddy" => {
+                if let Some(win) = app.get_webview_window("pet") {
+                    let _ = win.show();
+                    let _ = win.set_focus();
+                }
+                let _ = app.emit("open-picker", ());
+            }
             "quit" => app.exit(0),
             "toggle" => {
                 if let Some(win) = app.get_webview_window("pet") {

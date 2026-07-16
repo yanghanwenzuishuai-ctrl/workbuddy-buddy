@@ -112,20 +112,32 @@ row and grow — but a real pet should define all 7.
 
 ---
 
-## 4. Install / upload your pet
+## 4. The buddy library & picker
 
-Drop your two files here and restart the pet — no rebuild needed:
+The app ships a **library** of buddies under `frontend/pets/<id>/` — each a pet
+pack (`pet.json` + `spritesheet.png` + a small `preview.png`) — listed in
+`frontend/pets/index.json`:
 
+```json
+{ "default": "sora-shiba",
+  "pets": [ { "id": "sora-shiba", "displayName": "Sora Shiba", "description": "…" }, … ] }
 ```
-~/.workbuddy-buddy/pet/
-  ├── pet.json
-  └── spritesheet.png
-```
 
-The desktop app serves this folder on `127.0.0.1:8792/userpet/` and prefers it
-over the built-in pet. Remove the folder to go back to the default.
+Switch buddies from the **menu-bar tray → 选择伙伴 / Choose buddy…**, or by
+**double-clicking the pet**. Your choice is remembered across restarts
+(localStorage). The `default` in `index.json` is used on first run.
 
-(In the browser/bridge build, the pet is the built-in one under `frontend/pet/`.)
+### Add your own buddy
+1. Build a pack per §2–3 (`pet.json` + transparent `spritesheet.png`).
+2. Make a thumbnail: crop the idle frame (top-left cell) and scale to ~120×130 → `preview.png`.
+3. Drop the folder into `frontend/pets/<your-id>/` and add an entry to
+   `frontend/pets/index.json`.
+4. Rebuild the desktop app (or, in the browser/bridge build, just reload) — your
+   buddy shows up in the picker.
+
+`assets/import_pets.py <src-dir>` does steps 2–3 for a whole folder of packs
+(validates dimensions/states, generates previews, rebuilds `index.json`).
+Runtime drop-in from `~/.workbuddy-buddy/pets/` (no rebuild) is a planned convenience.
 
 ---
 

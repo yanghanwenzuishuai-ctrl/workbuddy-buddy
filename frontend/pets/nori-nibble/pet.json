@@ -1,0 +1,18 @@
+{
+  "id": "nori-nibble",
+  "displayName": "Nori Nibble",
+  "description": "A cozy red panda in a navy hoodie with a bold striped tail and curious nature.",
+  "author": "John (with Codex)",
+  "license": "CC-BY-4.0",
+  "spritesheetPath": "spritesheet.png",
+  "frame": { "width": 192, "height": 208, "columns": 8, "rows": 7 },
+  "animations": {
+    "idle": { "row": 0, "frames": [0,1,2,3,4,5,6,7], "fps": 6, "loop": true },
+    "thinking": { "row": 1, "frames": [0,1,2,3,4,5,6,7], "fps": 10, "loop": true },
+    "working": { "row": 2, "frames": [0,1,2,3,4,5,6,7], "fps": 12, "loop": true },
+    "review": { "row": 3, "frames": [0,1,2,3,4,5,6,7], "fps": 10, "loop": true },
+    "waiting": { "row": 4, "frames": [0,1,2,3,4,5,6,7], "fps": 5, "loop": true },
+    "done": { "row": 5, "frames": [0,1,2,3,4,5,6,7], "fps": 8, "loop": true },
+    "failed": { "row": 6, "frames": [0,1,2,3,4,5,6,7], "fps": 4, "loop": true }
+  }
+}
