@@ -92,6 +92,14 @@ pub fn start(app: AppHandle) {
                     let _ = req.respond(resp);
                 };
 
+                if method == Method::Get && path == "/userpets" {
+                    respond(req, 200, &serde_json::to_string(&scan_user_pets()).unwrap_or_else(|_| "[]".into()));
+                    return;
+                }
+                if method == Method::Get && path.starts_with("/userpets/") {
+                    serve_userpets(&path, req);
+                    return;
+                }
                 if method == Method::Get && path.starts_with("/userpet/") {
                     serve_userpet(&path, req);
                     return;
@@ -163,6 +171,65 @@ fn serve_userpet(path: &str, req: tiny_http::Request) {
             let resp = cors(Response::from_data(bytes)
                 .with_header(Header::from_bytes("Content-Type", ct).unwrap()));
             let _ = req.respond(resp);
+        }
+        Err(_) => { let _ = req.respond(cors(Response::from_string("not found").with_status_code(404))); }
+    }
+}
+
+fn user_pets_root() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    std::path::Path::new(&home).join(".workbuddy-buddy").join("pets")
+}
+
+/// Scan `~/.workbuddy-buddy/pets/<id>/` for drop-in packs and return manifest
+/// entries `{id, displayName, description, preview}`. Called fresh each time the
+/// picker opens, so a newly dropped-in buddy appears without an app restart.
+fn scan_user_pets() -> Vec<serde_json::Value> {
+    let mut out = Vec::new();
+    let Ok(rd) = std::fs::read_dir(user_pets_root()) else { return out };
+    let mut dirs: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+    dirs.sort();
+    for dir in dirs {
+        if !dir.is_dir() || !dir.join("pet.json").exists() || !dir.join("spritesheet.png").exists() {
+            continue;
+        }
+        let Some(id) = dir.file_name().and_then(|s| s.to_str()).map(str::to_string) else { continue };
+        if id.is_empty() || id.starts_with('.') {
+            continue;
+        }
+        let (mut name, mut desc) = (id.clone(), String::new());
+        if let Ok(v) = std::fs::read_to_string(dir.join("pet.json"))
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).map_err(std::io::Error::other))
+        {
+            if let Some(n) = v.get("displayName").and_then(|x| x.as_str()) { name = n.to_string(); }
+            if let Some(d) = v.get("description").and_then(|x| x.as_str()) { desc = d.to_string(); }
+        }
+        out.push(serde_json::json!({
+            "id": id, "displayName": name, "description": desc,
+            "preview": dir.join("preview.png").exists(),
+        }));
+    }
+    out
+}
+
+/// Serve `~/.workbuddy-buddy/pets/<id>/<file>` (json/png/webp only, no traversal).
+fn serve_userpets(path: &str, req: tiny_http::Request) {
+    let rel = &path["/userpets/".len()..];
+    let parts: Vec<&str> = rel.split('/').collect();
+    let bad = parts.len() != 2 || parts.iter().any(|c| c.is_empty() || *c == "..");
+    let fname = parts.last().copied().unwrap_or("");
+    let ok_ext = fname.ends_with(".json") || fname.ends_with(".png") || fname.ends_with(".webp");
+    if bad || !ok_ext {
+        let _ = req.respond(cors(Response::from_string("bad path").with_status_code(400)));
+        return;
+    }
+    match std::fs::read(user_pets_root().join(rel)) {
+        Ok(bytes) => {
+            let ct = if fname.ends_with(".json") { "application/json; charset=utf-8" }
+                     else if fname.ends_with(".webp") { "image/webp" }
+                     else { "image/png" };
+            let _ = req.respond(cors(Response::from_data(bytes)
+                .with_header(Header::from_bytes("Content-Type", ct).unwrap())));
         }
         Err(_) => { let _ = req.respond(cors(Response::from_string("not found").with_status_code(404))); }
     }

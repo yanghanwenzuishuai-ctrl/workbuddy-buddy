@@ -127,17 +127,29 @@ Switch buddies from the **menu-bar tray → 选择伙伴 / Choose buddy…**, or
 **double-clicking the pet**. Your choice is remembered across restarts
 (localStorage). The `default` in `index.json` is used on first run.
 
-### Add your own buddy
-1. Build a pack per §2–3 (`pet.json` + transparent `spritesheet.png`).
-2. Make a thumbnail: crop the idle frame (top-left cell) and scale to ~120×130 → `preview.png`.
-3. Drop the folder into `frontend/pets/<your-id>/` and add an entry to
-   `frontend/pets/index.json`.
-4. Rebuild the desktop app (or, in the browser/bridge build, just reload) — your
-   buddy shows up in the picker.
+### Add your own buddy — two ways
 
-`assets/import_pets.py <src-dir>` does steps 2–3 for a whole folder of packs
-(validates dimensions/states, generates previews, rebuilds `index.json`).
-Runtime drop-in from `~/.workbuddy-buddy/pets/` (no rebuild) is a planned convenience.
+**A. Runtime drop-in (no rebuild — for your own use):**
+Drop a pack folder into `~/.workbuddy-buddy/pets/<your-id>/`:
+
+```
+~/.workbuddy-buddy/pets/my-fox/
+  ├── pet.json
+  ├── spritesheet.png
+  └── preview.png        # optional; shows 🐾 in the picker if omitted
+```
+
+The desktop app rescans this folder every time the picker opens, so your buddy
+appears (tagged **自定义 / custom**) — no rebuild, no restart.
+
+**B. Bundle into the library (for the repo / to ship it):**
+1. Put the pack in `frontend/pets/<your-id>/` and add an entry to
+   `frontend/pets/index.json` (`id`, `displayName`, `description`).
+2. Rebuild the desktop app (or, in the browser/bridge build, just reload).
+
+`assets/import_pets.py <src-dir>` automates B for a whole folder of packs
+(validates dimensions/states, generates `preview.png`, rebuilds `index.json`) —
+and its output is exactly the drop-in format for A.
 
 ---
 

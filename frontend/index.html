@@ -62,14 +62,20 @@
   #picker .pclose { border: none; background: #eef0f6; color: #667; width: 26px; height: 26px;
     border-radius: 50%; font-size: 15px; cursor: pointer; line-height: 1; }
   #picker .pgrid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr;
-    gap: 8px; padding: 4px 12px 14px; }
-  #picker .pcard { background: #fff; border: 2px solid #eceef5; border-radius: 12px; padding: 8px 6px 6px;
-    text-align: center; cursor: pointer; transition: border-color .12s, transform .08s; }
+    gap: 8px; padding: 4px 12px 8px; }
+  #picker .pcard { position: relative; background: #fff; border: 2px solid #eceef5; border-radius: 12px;
+    padding: 8px 6px 6px; text-align: center; cursor: pointer; transition: border-color .12s, transform .08s; }
   #picker .pcard:hover { transform: translateY(-1px); border-color: #cfd6ec; }
   #picker .pcard.sel { border-color: #4a6cf7; background: #f5f8ff; }
   #picker .pcard img { width: 74px; height: 80px; image-rendering: pixelated; object-fit: contain; }
+  #picker .pcard .pph { width: 74px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 34px; }
   #picker .pcard .pname { font-size: 11px; font-weight: 600; color: #3a4258; margin-top: 2px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #picker .pbadge { position: absolute; top: 6px; right: 6px; font-size: 9px; background: #4a6cf7;
+    color: #fff; border-radius: 5px; padding: 1px 5px; }
+  #picker .pempty { grid-column: 1 / -1; text-align: center; color: #9aa1b8; font-size: 12px; padding: 24px; }
+  #picker .pfoot { font-size: 10px; color: #9aa1b8; padding: 4px 14px 10px; text-align: center; line-height: 1.6; }
+  #picker .pfoot code { background: #eef0f6; border-radius: 4px; padding: 0 4px; }
 </style>
 </head>
 <body>
@@ -82,17 +88,22 @@
   <div id="picker">
     <div class="phead"><b>选择你的伙伴</b><button class="pclose" title="关闭">✕</button></div>
     <div class="pgrid"></div>
+    <div class="pfoot">把 pet 包放进 <code>~/.workbuddy-buddy/pets/</code> 即可添加自己的伙伴（打开此面板自动刷新）</div>
   </div>
   <div id="stage"><canvas id="pet" width="192" height="208"></canvas></div>
   <div class="label" id="lbl">idle</div>
   <div class="controls dev" id="ctrls"></div>
 <script>
 const STATES = ["idle", "thinking", "working", "review", "waiting", "done", "failed"];
+const APPROVAL = "http://127.0.0.1:8792";   // Tauri approval/pet server (absent in bridge/browser)
 const canvas = document.getElementById("pet");
 const ctx = canvas.getContext("2d");
 
 let pet = null, sheet = null, cur = "idle", frameIdx = 0, acc = 0, lastT = 0;
-let ready = false, started = false, pendingState = null, activePetId = null;
+let ready = false, started = false, pendingState = null, activeKey = null;
+let petList = [], bundledCache = null, defaultId = null;
+
+const petKey = p => p.source + ":" + p.id;
 
 function validatePet(p) {
   if (!p || !p.frame || !p.frame.width || !p.frame.height || !p.frame.columns)
@@ -113,10 +124,10 @@ function renderError(err) {
   ctx.fillText("!", W / 2, H / 2 + 7);
 }
 
-// Load (or switch to) a pet from the bundled library. Loads into temp images so
-// a failed switch never blanks the current pet.
-async function loadPet(id) {
-  const base = "pets/" + id + "/";
+// Load (or switch to) a pet descriptor {id, base, source}. base ends in "/".
+// Loads into temp images so a failed switch never blanks the current pet.
+async function loadPetDesc(p) {
+  const base = p.base;
   try {
     const r = await fetch(base + "pet.json");
     if (!r.ok) throw new Error("pet.json HTTP " + r.status);
@@ -132,8 +143,8 @@ async function loadPet(id) {
     canvas.width = pet.frame.width; canvas.height = pet.frame.height;
     ctx.imageSmoothingEnabled = false;
     frameIdx = 0; acc = 0;
-    activePetId = id;
-    try { localStorage.setItem("wb-buddy-pet", id); } catch (_) {}
+    activeKey = petKey(p);
+    try { localStorage.setItem("wb-buddy-pet", activeKey); } catch (_) {}
     markPickerSelection();
     if (!ready) {
       ready = true;
@@ -146,20 +157,43 @@ async function loadPet(id) {
   }
 }
 
+// Merge the built-in library (embedded) with user drop-in packs (served by the
+// desktop app from ~/.workbuddy-buddy/pets/). Re-fetches user packs each call.
+async function refreshLibrary() {
+  if (!bundledCache) {
+    try {
+      const idx = await fetch("pets/index.json").then(r => r.ok ? r.json() : null);
+      defaultId = idx && idx.default;
+      bundledCache = (idx && idx.pets || []).map(p => ({
+        id: p.id, displayName: p.displayName, description: p.description,
+        source: "builtin", base: "pets/" + p.id + "/", preview: "pets/" + p.id + "/preview.png",
+      }));
+    } catch (_) { bundledCache = []; }
+  }
+  let user = [];
+  try {
+    const us = await fetch(APPROVAL + "/userpets").then(r => r.ok ? r.json() : null);
+    if (Array.isArray(us)) user = us.map(p => ({
+      id: p.id, displayName: p.displayName, description: p.description,
+      source: "user", base: APPROVAL + "/userpets/" + p.id + "/",
+      preview: p.preview ? APPROVAL + "/userpets/" + p.id + "/preview.png" : null,
+    }));
+  } catch (_) {}
+  petList = [...bundledCache, ...user];
+  buildPicker(petList);
+}
+
 async function boot() {
   buildControls();
-  let idx = null;
-  try { idx = await fetch("pets/index.json").then(r => r.ok ? r.json() : null); } catch (_) {}
-  let id = null;
-  try { id = localStorage.getItem("wb-buddy-pet"); } catch (_) {}
-  if (idx && idx.pets && idx.pets.length) {
-    buildPicker(idx.pets);
-    const valid = new Set(idx.pets.map(p => p.id));
-    if (!id || !valid.has(id)) id = idx.default || idx.pets[0].id;
-  } else if (!id) {
-    id = "sora-shiba";
-  }
-  await loadPet(id);
+  await refreshLibrary();
+  let key = null;
+  try { key = localStorage.getItem("wb-buddy-pet"); } catch (_) {}
+  let chosen = petList.find(p => petKey(p) === key)
+            || petList.find(p => p.source === "builtin" && p.id === defaultId)
+            || petList.find(p => p.source === "builtin")
+            || petList[0];
+  if (chosen) await loadPetDesc(chosen);
+  else renderError(new Error("no pets found"));
 }
 
 function anim() { return pet.animations[cur] || pet.animations.idle; }
@@ -222,28 +256,41 @@ function runDemo() {
 
 // ---- buddy picker ----
 const $picker = document.getElementById("picker");
+function thumb(p) {
+  if (p.preview) {
+    const img = document.createElement("img"); img.src = p.preview; img.alt = "";
+    img.onerror = () => img.replaceWith(placeholder());
+    return img;
+  }
+  return placeholder();
+}
+function placeholder() { const d = document.createElement("div"); d.className = "pph"; d.textContent = "🐾"; return d; }
 function buildPicker(pets) {
   const grid = $picker.querySelector(".pgrid");
   grid.innerHTML = "";
+  if (!pets.length) { grid.innerHTML = '<div class="pempty">还没有伙伴</div>'; return; }
   pets.forEach(p => {
     const card = document.createElement("div");
-    card.className = "pcard"; card.dataset.id = p.id;
+    card.className = "pcard"; card.dataset.key = petKey(p);
     card.title = p.description || p.displayName || p.id;
-    const img = document.createElement("img");
-    img.src = "pets/" + p.id + "/preview.png"; img.alt = "";
+    card.appendChild(thumb(p));
     const name = document.createElement("div");
     name.className = "pname"; name.textContent = p.displayName || p.id;
-    card.appendChild(img); card.appendChild(name);
-    card.onclick = () => { loadPet(p.id); closePicker(); };
+    card.appendChild(name);
+    if (p.source === "user") {
+      const badge = document.createElement("span");
+      badge.className = "pbadge"; badge.textContent = "自定义";
+      card.appendChild(badge);
+    }
+    card.onclick = () => { loadPetDesc(p); closePicker(); };
     grid.appendChild(card);
   });
   markPickerSelection();
 }
 function markPickerSelection() {
-  $picker.querySelectorAll(".pcard").forEach(c =>
-    c.classList.toggle("sel", c.dataset.id === activePetId));
+  $picker.querySelectorAll(".pcard").forEach(c => c.classList.toggle("sel", c.dataset.key === activeKey));
 }
-function openPicker() { markPickerSelection(); $picker.classList.add("show"); }
+async function openPicker() { await refreshLibrary(); markPickerSelection(); $picker.classList.add("show"); }
 function closePicker() { $picker.classList.remove("show"); }
 $picker.querySelector(".pclose").addEventListener("click", closePicker);
 $picker.addEventListener("click", e => { if (e.target === $picker) closePicker(); });
@@ -285,7 +332,7 @@ $a.querySelector(".deny").addEventListener("click", () => decideApproval("deny")
 // ---- state source contract ----
 window.wbBuddy = {
   setState, getState: () => cur, isReady: () => ready,
-  loadPet, openPicker, getPet: () => activePetId,
+  openPicker, getPet: () => activeKey, refreshLibrary,
   _testApproval: p => { approvalQ.push(p || { id: 0, tool_name: "Bash", detail: "ls -la", seconds: 50 }); renderApproval(); },
 };
 
