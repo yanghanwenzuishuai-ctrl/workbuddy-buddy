@@ -338,9 +338,6 @@ window.wbBuddy = {
 
 if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
 
-// double-click the pet to choose a buddy (works in any host)
-document.getElementById("stage").addEventListener("dblclick", openPicker);
-
 if (window.__TAURI__ && window.__TAURI__.event) {
   window.__TAURI__.event.listen("pet-state", e => setState((e.payload || "").toString().trim()));
   window.__TAURI__.event.listen("open-picker", () => openPicker());
@@ -350,16 +347,33 @@ if (window.__TAURI__ && window.__TAURI__.event) {
     if (approvalCur && approvalCur.id === id) dismissApproval();
     else { const i = approvalQ.findIndex(x => x.id === id); if (i >= 0) approvalQ.splice(i, 1); }
   });
+  // Pet interactions (Codex-pet style): left-click → bring WorkBuddy to front;
+  // drag (move > 4px while pressed) → move the window; right-click → buddy picker.
   try {
     const w = window.__TAURI__.window;
     const appWin = w && (w.getCurrentWindow || w.getCurrent) ? (w.getCurrentWindow || w.getCurrent).call(w) : null;
-    if (appWin) {
-      document.getElementById("stage").addEventListener("mousedown", (e) => {
-        if (e.button === 0) { try { appWin.startDragging(); } catch (_) {} }
-      });
-    }
+    const stage = document.getElementById("stage");
+    let downPt = null, dragged = false;
+    stage.addEventListener("mousedown", e => {
+      if (e.button !== 0) return;
+      downPt = { x: e.screenX, y: e.screenY }; dragged = false;
+    });
+    stage.addEventListener("mousemove", e => {
+      if (downPt && !dragged && appWin &&
+          Math.abs(e.screenX - downPt.x) + Math.abs(e.screenY - downPt.y) > 4) {
+        dragged = true;
+        try { appWin.startDragging(); } catch (_) {}
+      }
+    });
+    window.addEventListener("mouseup", () => { downPt = null; });
+    stage.addEventListener("click", () => {
+      if (!dragged) window.__TAURI__.event.emit("activate-host");   // click (not drag) → foreground WorkBuddy
+    });
+    stage.addEventListener("contextmenu", e => { e.preventDefault(); openPicker(); });  // right-click → picker
   } catch (_) {}
 } else {
+  // browser/bridge dev mode: double-click opens the picker; poll for state.
+  document.getElementById("stage").addEventListener("dblclick", openPicker);
   const poll = async () => {
     try { const r = await fetch("/state", { cache: "no-store" }); if (r.ok) setState((await r.text()).trim()); }
     catch (e) {}

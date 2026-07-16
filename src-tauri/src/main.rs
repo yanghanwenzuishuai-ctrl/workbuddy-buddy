@@ -12,15 +12,31 @@ mod approval;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    Emitter, Manager,
+    Emitter, Listener, Manager,
 };
 use wb_buddy_core::State;
+
+/// Bring the host agent app to the foreground (clicking the pet, Codex-pet style).
+/// Target app name is `WorkBuddy` by default; override with `WB_BUDDY_HOST_APP`.
+fn activate_host() {
+    let app = std::env::var("WB_BUDDY_HOST_APP").unwrap_or_else(|_| "WorkBuddy".into());
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").args(["-a", &app]).spawn();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = &app; // TODO: Windows/Linux foreground activation
+    }
+}
 
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
             build_tray(app)?;
             approval::start(app.handle().clone());
+            // clicking the pet brings the host app (WorkBuddy) to the front
+            app.listen_any("activate-host", |_| activate_host());
 
             // Tail the spool on a background thread; push every state change to the pet window.
             let handle = app.handle().clone();
