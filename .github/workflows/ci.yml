@@ -1,0 +1,12 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust tests (pure crates)
+        run: cargo test -p wb-buddy-core -p wb-buddy-watch --locked
+      - name: Privacy contract
+        run: python3 hooks/test_privacy.py
