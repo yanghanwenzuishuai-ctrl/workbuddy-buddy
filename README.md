@@ -24,8 +24,11 @@ Codex Pets ecosystem.
   new one in without a rebuild.
 - **The pet is a permission gate.** When WorkBuddy needs approval, the pet pops an
   **允许 / 拒绝** bubble and your click is fed back as the decision.
-- **Click to summon.** Click the pet to bring WorkBuddy to the front; drag to move;
-  right-click for the buddy picker.
+- **Click to summon.** Click the pet to bring WorkBuddy to the front; drag to move
+  (its position is remembered across launches); right-click for the buddy picker.
+- **Stays out of your way.** Only the pet's silhouette catches clicks — the
+  transparent area around it is click-through, so the pet never blocks the window
+  underneath. Toggle it from the tray.
 - **Private by construction.** The pet only ever sees the *shape* of events — never
   your prompts, tool arguments, or messages. It runs fully local.
 

@@ -8,9 +8,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod approval;
+mod ux;
 
 use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     Emitter, Listener, Manager,
 };
@@ -35,6 +36,8 @@ fn main() {
         .setup(|app| {
             build_tray(app)?;
             approval::start(app.handle().clone());
+            // transparent-area click-through + remember window position
+            ux::start(app);
             // clicking the pet brings the host app (WorkBuddy) to the front
             app.listen_any("activate-host", |_| activate_host());
 
@@ -58,14 +61,30 @@ fn main() {
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     let buddy = MenuItem::with_id(app, "buddy", "选择伙伴 / Choose buddy…", true, None::<&str>)?;
     let toggle = MenuItem::with_id(app, "toggle", "Show / hide pet", true, None::<&str>)?;
+    // Click-through defaults on (checked); the tray item lets the user disable it.
+    let clickthrough =
+        CheckMenuItem::with_id(app, "clickthrough", "点击穿透透明区域", true, true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit workbuddy-buddy", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&buddy, &toggle, &PredefinedMenuItem::separator(app)?, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &buddy,
+            &toggle,
+            &clickthrough,
+            &PredefinedMenuItem::separator(app)?,
+            &quit,
+        ],
+    )?;
 
     let mut builder = TrayIconBuilder::with_id("wb-buddy-tray")
         .tooltip("workbuddy-buddy")
         .menu(&menu)
         .show_menu_on_left_click(true)
-        .on_menu_event(|app, event| match event.id.as_ref() {
+        .on_menu_event(move |app, event| match event.id.as_ref() {
+            "clickthrough" => {
+                let on = ux::toggle(app);
+                let _ = clickthrough.set_checked(on);
+            }
             "buddy" => {
                 if let Some(win) = app.get_webview_window("pet") {
                     let _ = win.show();
