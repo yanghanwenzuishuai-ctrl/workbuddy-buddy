@@ -1,0 +1,173 @@
+{
+  "manifest_version": 1,
+  "schema_cases": [
+    {
+      "fixture": "edge-report-envelope.valid.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": true
+    },
+    {
+      "fixture": "edge-report-envelope.valid.waiting-active.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": true
+    },
+    {
+      "fixture": "edge-report-heartbeat.valid.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "#/$defs/heartbeatEnvelope",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": true
+    },
+    {
+      "fixture": "edge-report-ack.valid.json",
+      "schema": "../schemas/edge-report-ack.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": true
+    },
+    {
+      "fixture": "edge-report-ack.future-n-minus-one.valid.json",
+      "schema": "../schemas/edge-report-ack.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": true
+    },
+    {
+      "fixture": "problem.valid.json",
+      "schema": "../schemas/problem.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": true
+    },
+    {
+      "fixture": "problem.future-n-minus-one.valid.json",
+      "schema": "../schemas/problem.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": true
+    },
+    {
+      "fixture": "public-office-snapshot.valid.json",
+      "schema": "../schemas/public-office-snapshot.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": true
+    },
+    {
+      "fixture": "edge-report-envelope.invalid.received-at.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": false,
+      "expect_protocol_valid": false,
+      "expected_problem_code": "invalid_request"
+    },
+    {
+      "fixture": "edge-report-envelope.invalid.client-idle-stage.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": false,
+      "expect_protocol_valid": false,
+      "expected_problem_code": "invalid_request"
+    },
+    {
+      "fixture": "edge-report-envelope.invalid.privacy-fields.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": false,
+      "expect_protocol_valid": false,
+      "expected_problem_code": "invalid_request"
+    },
+    {
+      "fixture": "edge-report-envelope.invalid.state-pair.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": false,
+      "expect_protocol_valid": false,
+      "expected_problem_code": "report_semantics_invalid"
+    },
+    {
+      "fixture": "edge-report-heartbeat.invalid.state-transition.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "#/$defs/heartbeatEnvelope",
+      "expect_schema_valid": false,
+      "expect_protocol_valid": false,
+      "expected_problem_code": "report_semantics_invalid"
+    },
+    {
+      "fixture": "public-office-snapshot.invalid.privacy-fields.json",
+      "schema": "../schemas/public-office-snapshot.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": false,
+      "expect_protocol_valid": false
+    },
+    {
+      "fixture": "public-office-snapshot.invalid.active-idle-stage.json",
+      "schema": "../schemas/public-office-snapshot.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": false,
+      "expect_protocol_valid": false
+    },
+    {
+      "fixture": "public-office-snapshot.invalid.failed-idle-stage.json",
+      "schema": "../schemas/public-office-snapshot.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": false,
+      "expect_protocol_valid": false
+    },
+    {
+      "fixture": "edge-report-envelope.semantic.sequence-gap.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": false,
+      "scenario": "intra_batch_sequence_gap",
+      "expected_problem_code": "sequence_gap"
+    },
+    {
+      "fixture": "edge-report-envelope.semantic.sequence-overlap.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": false,
+      "scenario": "intra_batch_sequence_overlap",
+      "expected_problem_code": "sequence_overlap"
+    },
+    {
+      "fixture": "edge-report-envelope.semantic.first-sequence-mismatch.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": false,
+      "scenario": "first_sequence_mismatch",
+      "expected_problem_code": "report_semantics_invalid"
+    },
+    {
+      "fixture": "edge-report-envelope.semantic.new-boot-heartbeat-first.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "schema_fragment": "",
+      "expect_schema_valid": true,
+      "expect_protocol_valid": false,
+      "scenario": "new_boot_requires_state_snapshot_at_sequence_one",
+      "expected_problem_code": "report_semantics_invalid"
+    }
+  ],
+  "protocol_scenarios": [
+    {
+      "fixture": "edge-report-envelope.semantic.replay-conflict-pair.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "envelope_json_pointers": [
+        "/original",
+        "/exact_replay",
+        "/conflicting_replay"
+      ],
+      "expect_each_schema_valid": true,
+      "scenario": "exact_replay_then_same_sequence_different_payload",
+      "expected_exact_replay_result": "return_same_ack_without_side_effects",
+      "expected_conflicting_replay_problem_code": "sequence_conflict"
+    }
+  ]
+}

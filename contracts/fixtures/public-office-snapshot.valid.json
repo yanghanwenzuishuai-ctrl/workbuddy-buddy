@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "office_revision": 314,
+  "generated_at": "2026-07-24T17:15:00Z",
+  "office": {
+    "name": "Salted Fish Studio",
+    "local_date": "2026-07-24",
+    "timezone": "America/Los_Angeles"
+  },
+  "rooms": [
+    {
+      "room_id": "44444444-4444-4444-8444-444444444444",
+      "name": "Lobby",
+      "scene_capacity": 24
+    }
+  ],
+  "agents": [
+    {
+      "mount_id": "55555555-5555-4555-8555-555555555555",
+      "room_id": "44444444-4444-4444-8444-444444444444",
+      "alias": "Mochi",
+      "pet_id": "sora-shiba",
+      "presence": "online",
+      "display_state": "done",
+      "idle_stage": "fresh",
+      "scene_slot": 0
+    },
+    {
+      "mount_id": "66666666-6666-4666-8666-666666666666",
+      "room_id": "44444444-4444-4444-8444-444444444444",
+      "alias": "Pip",
+      "pet_id": "pixel-penguin",
+      "presence": "offline",
+      "display_state": null,
+      "idle_stage": "none",
+      "scene_slot": null
+    }
+  ],
+  "leaderboard": {
+    "office_local_date": "2026-07-24",
+    "status": "provisional",
+    "as_of": "2026-07-24T17:15:00Z",
+    "entries": [
+      {
+        "rank": 1,
+        "mount_id": "55555555-5555-4555-8555-555555555555",
+        "alias": "Mochi",
+        "pet_id": "sora-shiba",
+        "slacking_seconds": 1800
+      }
+    ]
+  },
+  "daily_award": {
+    "office_local_date": "2026-07-23",
+    "awarded_at": "2026-07-24T07:01:30Z",
+    "final": true,
+    "winner": {
+      "mount_id": "55555555-5555-4555-8555-555555555555",
+      "alias": "Mochi",
+      "pet_id": "sora-shiba",
+      "slacking_seconds": 7200
+    }
+  },
+  "demo_data": false,
+  "disclaimer": "趣味统计 · 非考勤依据"
+}

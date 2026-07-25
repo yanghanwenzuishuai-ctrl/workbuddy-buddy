@@ -1,0 +1,10 @@
+{
+  "type": "urn:workbuddy-buddy:problem:protocol-version-unsupported",
+  "title": "Protocol version unsupported",
+  "status": 426,
+  "code": "protocol_version_unsupported",
+  "detail": "Upgrade to a supported Edge protocol.",
+  "instance": "/api/v1/edge/events:batch",
+  "current_protocol": 2,
+  "min_supported_protocol": 1
+}

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/contracts/schemas/problem.v1.schema.json",
+  "title": "WorkBuddy Buddy API Problem v1",
+  "description": "A strict RFC 9457-style problem response with stable machine-readable codes.",
+  "$comment": "When present, current_protocol and min_supported_protocol describe the responding server and may be future N/N-1 values even though this is the Problem v1 shape. Application validation enforces 1 <= min_supported_protocol <= current_protocol.",
+  "type": "object",
+  "required": [
+    "type",
+    "title",
+    "status",
+    "code"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "status": {
+      "type": "integer",
+      "minimum": 400,
+      "maximum": 599
+    },
+    "code": {
+      "enum": [
+        "invalid_request",
+        "protocol_version_unsupported",
+        "invalid_signature",
+        "instance_not_found",
+        "device_revoked",
+        "stale_boot",
+        "sequence_gap",
+        "sequence_overlap",
+        "sequence_conflict",
+        "report_semantics_invalid",
+        "payload_too_large",
+        "public_office_not_found",
+        "revision_gap",
+        "rate_limited",
+        "temporarily_unavailable",
+        "internal_error"
+      ]
+    },
+    "detail": {
+      "description": "A safe diagnostic summary that must not echo credentials, private event content, or complete tokens.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "instance": {
+      "type": "string",
+      "format": "uri-reference",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "expected_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "current_protocol": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "min_supported_protocol": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "retry_after_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400
+    }
+  },
+  "additionalProperties": false
+}

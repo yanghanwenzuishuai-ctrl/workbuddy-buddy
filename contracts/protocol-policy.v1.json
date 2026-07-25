@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": 1,
+  "protocol": {
+    "current": 1,
+    "minimum_supported": 1,
+    "support_window": 2
+  },
+  "batch": {
+    "maximum_events": 64,
+    "sequence_starts_at": 1,
+    "sequence_scope": [
+      "instance_id",
+      "boot_id"
+    ],
+    "shared_sequence_event_kinds": [
+      "state_transition",
+      "heartbeat"
+    ],
+    "strictly_increasing": true,
+    "contiguous_within_batch": true,
+    "batch_atomic": true,
+    "current_boot_exact_replay": "return_same_ack_without_side_effects",
+    "fenced_boot_replay": "stale_boot_precedes_replay_lookup",
+    "same_sequence_different_payload": "sequence_conflict",
+    "gap": "sequence_gap",
+    "partial_overlap": "sequence_overlap",
+    "idempotency_key": [
+      "instance_id",
+      "boot_generation",
+      "sequence"
+    ]
+  },
+  "state_transition": {
+    "allowed_display_activity_pairs": [
+      [
+        "idle",
+        "unknown"
+      ],
+      [
+        "idle",
+        "eligible_idle"
+      ],
+      [
+        "working",
+        "active"
+      ],
+      [
+        "waiting",
+        "waiting"
+      ],
+      [
+        "waiting",
+        "active"
+      ],
+      [
+        "waiting",
+        "eligible_idle"
+      ],
+      [
+        "done",
+        "eligible_idle"
+      ],
+      [
+        "failed",
+        "failed"
+      ]
+    ]
+  },
+  "boot_fencing": {
+    "previous_boot_id_required": true,
+    "initial_previous_boot_id": null,
+    "new_boot_first_event_kind": "state_transition",
+    "mismatch_problem_code": "stale_boot"
+  },
+  "time": {
+    "authoritative_boundary": "server_received_at",
+    "observed_at_role": "diagnostic_only",
+    "default_maximum_observed_skew_seconds": 300,
+    "late_events_backfill_scoring": false
+  },
+  "presence": {
+    "default_heartbeat_interval_seconds": 30,
+    "default_lease_ttl_seconds": 90,
+    "lease_expiry_breaks_eligible_idle_interval": true
+  },
+  "slacking": {
+    "grace_seconds": 900,
+    "grace_counts_toward_score": false,
+    "stage_boundary_inclusive": true,
+    "score_seconds_formula": "max(0, continuous_eligible_seconds - grace_seconds)",
+    "interval_breakers": [
+      "non_eligible_activity",
+      "lease_expired",
+      "boot_replaced",
+      "stats_opt_out",
+      "mount_deactivated",
+      "schedule_window_closed",
+      "schedule_version_changed"
+    ],
+    "non_breaking_consent_changes": [
+      "presence_visible",
+      "poster_opt_in"
+    ],
+    "resume_starts_new_interval": true,
+    "stage_boundaries_seconds": {
+      "fresh": 900,
+      "salted": 1500,
+      "costume": 2100,
+      "fish": 3600
+    },
+    "client_idle_stage_is_authoritative": false
+  },
+  "public_projection": {
+    "consent_rules": {
+      "agents": [
+        "presence_visible"
+      ],
+      "leaderboard": [
+        "stats_opt_in"
+      ],
+      "daily_award": [
+        "stats_opt_in"
+      ],
+      "poster_live_scene": [
+        "presence_visible",
+        "poster_opt_in"
+      ],
+      "poster_statistics": [
+        "stats_opt_in",
+        "poster_opt_in"
+      ]
+    },
+    "withdrawal_effect": "increment_revision_and_filter_next_snapshot_sse_and_new_poster",
+    "completed_award_after_stats_withdrawal": "hide_public_projection_without_reassignment",
+    "office_day_assignment": "schedule_window_start_local_date",
+    "semantic_invariants": [
+      "leaderboard_office_day_equals_office_local_date",
+      "room_ids_are_unique",
+      "agent_mount_ids_are_unique",
+      "agent_rooms_exist",
+      "occupied_scene_slots_are_unique_and_within_room_capacity",
+      "leaderboard_ranks_are_unique_and_contiguous",
+      "leaderboard_mount_ids_are_unique",
+      "leaderboard_scores_are_non_increasing"
+    ]
+  },
+  "leaderboard": {
+    "primary_order": {
+      "field": "slacking_seconds",
+      "direction": "descending"
+    },
+    "tie_breakers": [
+      {
+        "field": "score_reached_at",
+        "direction": "ascending"
+      },
+      {
+        "field": "stable_agent_id",
+        "direction": "ascending"
+      }
+    ],
+    "private_tie_break_fields_are_not_public": true
+  },
+  "sse": {
+    "revision_scope": "office",
+    "last_event_id_and_after_revision_must_match": true,
+    "future_cursor_problem_code": "invalid_request",
+    "minimum_replay_cursor_is_explicit": true,
+    "duplicate_revision": "ignore_idempotently",
+    "pre_stream_retention_gap_problem_code": "revision_gap",
+    "in_stream_gap": "emit_resync_required_then_close"
+  },
+  "privacy": {
+    "forbidden_edge_keys": [
+      "prompt",
+      "message",
+      "messages",
+      "reply",
+      "response",
+      "content",
+      "tool_args",
+      "tool_arguments",
+      "tool_input",
+      "tool_output",
+      "command",
+      "output",
+      "path",
+      "project",
+      "project_name",
+      "repository",
+      "repo",
+      "session",
+      "session_id",
+      "transcript_path",
+      "spool",
+      "mail_body",
+      "email_body",
+      "oauth_token",
+      "access_token",
+      "refresh_token",
+      "token"
+    ]
+  },
+  "compatibility": {
+    "server_supports_previous_when_it_exists": true,
+    "unsupported_protocol_problem_code": "protocol_version_unsupported",
+    "response_advertises": [
+      "current_protocol",
+      "min_supported_protocol"
+    ]
+  }
+}

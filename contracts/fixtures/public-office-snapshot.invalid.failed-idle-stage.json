@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "office_revision": 316,
+  "generated_at": "2026-07-24T17:15:00Z",
+  "office": {
+    "name": "Salted Fish Studio",
+    "local_date": "2026-07-24",
+    "timezone": "America/Los_Angeles"
+  },
+  "rooms": [
+    {
+      "room_id": "44444444-4444-4444-8444-444444444444",
+      "name": "Lobby",
+      "scene_capacity": 24
+    }
+  ],
+  "agents": [
+    {
+      "mount_id": "55555555-5555-4555-8555-555555555555",
+      "room_id": "44444444-4444-4444-8444-444444444444",
+      "alias": "Mochi",
+      "pet_id": "sora-shiba",
+      "presence": "online",
+      "display_state": "failed",
+      "idle_stage": "costume",
+      "scene_slot": 0
+    }
+  ],
+  "leaderboard": {
+    "office_local_date": "2026-07-24",
+    "status": "provisional",
+    "as_of": "2026-07-24T17:15:00Z",
+    "entries": []
+  },
+  "daily_award": null,
+  "demo_data": false,
+  "disclaimer": "趣味统计 · 非考勤依据"
+}

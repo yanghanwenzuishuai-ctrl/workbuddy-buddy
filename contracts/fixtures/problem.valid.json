@@ -1,0 +1,11 @@
+{
+  "type": "urn:workbuddy-buddy:problem:sequence-gap",
+  "title": "Sequence gap",
+  "status": 409,
+  "code": "sequence_gap",
+  "detail": "The next accepted event must use sequence 44.",
+  "instance": "/api/v1/edge/events:batch",
+  "expected_sequence": 44,
+  "current_protocol": 1,
+  "min_supported_protocol": 1
+}

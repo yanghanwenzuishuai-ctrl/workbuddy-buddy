@@ -1,0 +1,632 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "WorkBuddy Buddy Control Plane API",
+    "version": "1.0.0",
+    "summary": "Versioned Edge reporting and public Office viewing contract.",
+    "description": "Milestone 0 contract for the WorkBuddy Buddy Control Plane.\n\nEdge reports are authenticated, signed, and fenced by `instance_id`, a\ncompare-and-swap-linked `boot_id`, and the per-boot `sequence`. A new boot is\naccepted only when its required `previous_boot_id` names the server's current\nboot (or is null for the first boot). State events and heartbeats share the\nsame strictly increasing, per-boot sequence space.\n\nThe server assigns one authoritative `server_received_at` to every accepted report. Client\n`observed_at` is diagnostic metadata only and MUST NOT determine leases,\ngrace periods, activity intervals, rankings, or awards. Likewise,\n`idle_stage` is never accepted as a scoring input: public idle stages are\nderived by the server from continuous eligible-idle time.\n\nProtocol v1 publishes `current_protocol = 1` and\n`min_supported_protocol = 1`; it does not imply or accept a fictional v0.\nWhen protocol N is introduced, the same response fields can advertise the\nN/N-1 compatibility window. Unsupported versions receive a structured `426`\nresponse so an Edge can present an actionable upgrade message without\ndiscarding its local desktop-pet state.\n",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{controlPlaneHost}",
+      "description": "Configured Control Plane origin.",
+      "variables": {
+        "controlPlaneHost": {
+          "default": "control-plane.example.invalid"
+        }
+      }
+    },
+    {
+      "url": "http://127.0.0.1:{port}",
+      "description": "Explicit local development mode only.",
+      "variables": {
+        "port": {
+          "default": "3000"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Edge",
+      "description": "Signed, idempotent reporting by enrolled Agent instances."
+    },
+    {
+      "name": "Public Office",
+      "description": "Unauthenticated, read-only views. Live `agents` are filtered by\n`presence_visible`; leaderboard entries and Daily Awards are filtered\nindependently by `stats_opt_in`. Poster consent is not part of this API\nprojection. No email address, human name, device secret, private history, or\nraw WorkBuddy event is exposed.\n"
+    }
+  ],
+  "paths": {
+    "/api/v1/edge/events:batch": {
+      "post": {
+        "tags": [
+          "Edge"
+        ],
+        "summary": "Report a bounded batch of derived state events.",
+        "description": "Durably and atomically accepts an ordered, contiguous batch of\nderived Edge events from one boot's monotonic sequence space. State\ntransitions and heartbeats consume that same space. No\nprefix of a rejected batch is applied. While that boot remains current,\nreplaying an entire batch with the same `instance_id`, accepted boot\ngeneration, sequence range, and canonical payload returns the same\nacknowledgement without side effects. A replay from a fenced boot always\nreturns `stale_boot` instead. Reusing any sequence with different canonical\ncontent is a conflict. A gap or partially overlapping replay is also a\nconflict; callers recover from the `expected_sequence` in the Problem response\nrather than skipping ahead.\n\nA new boot starts at sequence 1 and its first event MUST be a complete\n`state_transition` snapshot. Its required `previous_boot_id` is null only for\nthe first boot; otherwise it MUST exactly match the server's current boot.\nThis compare-and-swap establishes the next fencing generation without allowing\na delayed, previously unseen old boot to reverse-fence the current one. A\nmismatch or report from a fenced boot is rejected and MUST NOT update current\npresence, renew a lease, restart a grace period, or contribute to scoring.\n\nOnly privacy-safe derived state may be sent. Prompt text, messages, tool\narguments, filesystem paths, session contents, email bodies, OAuth\ntokens, raw spool records, and client-computed `idle_stage` are outside\nthis contract.\n",
+        "operationId": "reportEdgeEventBatchV1",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/edge-report-envelope.v1.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EdgeReportAccepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadEdgeReport"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthenticatedEdge"
+          },
+          "409": {
+            "$ref": "#/components/responses/EdgeFenceConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/EdgeBatchTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEdgeReport"
+          },
+          "426": {
+            "$ref": "#/components/responses/UnsupportedProtocol"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/edge/heartbeat": {
+      "post": {
+        "tags": [
+          "Edge"
+        ],
+        "summary": "Renew presence with a sequenced heartbeat.",
+        "description": "Accepts an Edge report envelope containing exactly one `heartbeat`\nevent for the already-established current boot. A heartbeat cannot establish\na new boot: sequence 1 of every new boot is sent to the batch endpoint as a\ncomplete state snapshot. Heartbeats consume the same monotonic sequence space\nas state transitions; they are not an independent counter. Replaying the same\ncanonical heartbeat returns the same acknowledgement without renewing the\nlease twice. A gap, a partial overlap, a multi-event envelope, or a\nnon-heartbeat event is rejected.\n\nA heartbeat may renew an active lease, but it cannot backfill an expired\nlease or recover idle time lost while offline. Lease calculations begin\nfrom the server's `server_received_at`, never from `observed_at` or `sent_at`.\nA heartbeat from a fenced boot is incapable of changing presence.\n",
+        "operationId": "reportEdgeHeartbeatV1",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/edge-report-envelope.v1.schema.json#/$defs/heartbeatEnvelope"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EdgeReportAccepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadEdgeReport"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthenticatedEdge"
+          },
+          "409": {
+            "$ref": "#/components/responses/EdgeFenceConflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/EdgeBatchTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEdgeReport"
+          },
+          "426": {
+            "$ref": "#/components/responses/UnsupportedProtocol"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/offices/{public_view_token}/snapshot": {
+      "get": {
+        "tags": [
+          "Public Office"
+        ],
+        "summary": "Read a consent-filtered Office snapshot.",
+        "description": "Returns a point-in-time public projection and its monotonic\n`office_revision`. The revision is the same cursor space used by the SSE\nendpoint, allowing a client to fetch this snapshot and then request\nevents strictly after it. Withdrawing any consent increments that revision\nand the next snapshot immediately removes the affected Mount from the\ncorresponding projection.\n\nThe `agents` list requires `presence_visible`; leaderboard entries and Daily\nAwards separately require `stats_opt_in`. One flag never substitutes for the\nother. If a completed Award's immutable winner withdraws `stats_opt_in`, the\nstored Award is not reassigned but the public `daily_award` projection becomes\nnull. `office.local_date` and `leaderboard.office_local_date` identify the\ncurrent scoring office-day and MUST be equal; a cross-midnight schedule window\nbelongs to the local date on which that window started.\n\n`idle_stage`, rankings, and awards in this projection are server-derived. The\nendpoint never returns the client-reported idle stage or an Edge's wall-clock\ncalculation.\n\nMissing, expired, rotated, and revoked public view tokens deliberately\nuse the same not-found response to avoid leaking Office existence.\n",
+        "operationId": "getPublicOfficeSnapshotV1",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PublicViewToken"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current consent-filtered Office projection.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/PrivateNoStore"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/OfficeRevisionEtag"
+              },
+              "X-Office-Revision": {
+                "$ref": "#/components/headers/OfficeRevision"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/public-office-snapshot.v1.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicOfficeNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/offices/{public_view_token}/events": {
+      "get": {
+        "tags": [
+          "Public Office"
+        ],
+        "summary": "Stream consent-filtered Office revisions over SSE.",
+        "description": "Opens a Server-Sent Events stream in the same monotonic revision space\nas the snapshot endpoint. Clients should first fetch a snapshot and\nreconnect with that `office_revision` as `Last-Event-ID` or\n`after_revision`. If both cursors are supplied they MUST be equal. A cursor\nabove the current Office revision is invalid and returns `400`; a cursor below\nthe server's explicit minimum replay cursor returns `409 revision_gap`, even\nwhen no replay events remain retained.\n\nA replayable update uses `event: office.snapshot`, sets `id` to the new\ndecimal `office_revision`, and carries one\n`public-office-snapshot.v1` JSON document in `data`. Duplicate revisions\nare idempotent and clients MUST ignore them. Comment frames may be used\nas transport keepalives and do not advance the revision.\n\nIf the requested revision is older than the retained replay window, the\nserver returns `409 application/problem+json` before opening the stream.\nIf a gap is discovered after streaming has begun, the server sends an\n`event: resync.required` control event and closes the connection; the\nclient then obtains a fresh snapshot.\n\nEvery emitted snapshot re-applies independent consent filters: `agents` by\n`presence_visible`, leaderboard and Daily Award data by `stats_opt_in`.\nWithdrawing a flag advances `office_revision`, so the next SSE projection\nremoves the affected data immediately. `poster_opt_in` is evaluated only when\ngenerating a new share asset and never broadens either underlying consent. No\nSSE event exposes raw Edge reports.\n",
+        "operationId": "streamPublicOfficeEventsV1",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PublicViewToken"
+          },
+          {
+            "$ref": "#/components/parameters/LastEventId"
+          },
+          {
+            "$ref": "#/components/parameters/AfterRevision"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream. Each `office.snapshot` data value conforms to\n`./schemas/public-office-snapshot.v1.schema.json`.\n",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/PrivateNoStore"
+              },
+              "X-Accel-Buffering": {
+                "description": "Disables proxy buffering where supported.",
+                "schema": {
+                  "type": "string",
+                  "const": "no"
+                }
+              }
+            },
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "contentMediaType": "text/event-stream"
+                },
+                "examples": {
+                  "snapshot": {
+                    "summary": "Full projection at revision 43.",
+                    "value": "id: 43\nevent: office.snapshot\ndata: {\"schema_version\":1,\"office_revision\":43,\"generated_at\":\"2026-07-24T12:00:00Z\",\"office\":{\"name\":\"演示办公室\",\"local_date\":\"2026-07-24\",\"timezone\":\"Asia/Shanghai\"},\"rooms\":[{\"room_id\":\"123e4567-e89b-42d3-a456-426614174000\",\"name\":\"Lobby\",\"scene_capacity\":24}],\"agents\":[],\"leaderboard\":{\"office_local_date\":\"2026-07-24\",\"status\":\"provisional\",\"as_of\":\"2026-07-24T12:00:00Z\",\"entries\":[]},\"daily_award\":null,\"demo_data\":true,\"disclaimer\":\"趣味统计 · 非考勤依据\"}\n\n"
+                  },
+                  "resyncRequired": {
+                    "summary": "Replay gap discovered after the stream opened.",
+                    "value": "event: resync.required\ndata: {\"reason\":\"revision_gap\",\"snapshot_url\":\"/api/v1/offices/redacted/snapshot\"}\n\n"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cursor is malformed or the two supplied cursors disagree.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/PrivateNoStore"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./schemas/problem.v1.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicOfficeNotFound"
+          },
+          "409": {
+            "description": "The requested cursor is outside the short-term replay window. The\nProblem response identifies `revision_gap`; the client must fetch a\nnew snapshot instead of guessing or skipping revisions.\n",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/PrivateNoStore"
+              },
+              "X-Office-Revision": {
+                "$ref": "#/components/headers/OfficeRevision"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "./schemas/problem.v1.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "description": "Optional request-attempt correlation key. Edge event idempotency does\nnot depend on this header; it is always enforced by\n`instance_id + accepted boot generation + sequence`.\n",
+        "schema": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._~-]+$"
+        }
+      },
+      "PublicViewToken": {
+        "name": "public_view_token",
+        "in": "path",
+        "required": true,
+        "description": "High-entropy, rotatable read-only capability. It is distinct from an\nOffice's public name and from invite tokens. Implementations store only\nits hash and redact the raw value from logs and error telemetry.\n",
+        "schema": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      },
+      "LastEventId": {
+        "name": "Last-Event-ID",
+        "in": "header",
+        "required": false,
+        "description": "Last fully applied decimal `office_revision`. The stream resumes with\nthe first retained revision greater than this value.\n",
+        "schema": {
+          "$ref": "#/components/schemas/RevisionCursor"
+        }
+      },
+      "AfterRevision": {
+        "name": "after_revision",
+        "in": "query",
+        "required": false,
+        "description": "Browser-friendly alternative to `Last-Event-ID`. When both are present,\nthey must have the same value.\n",
+        "schema": {
+          "$ref": "#/components/schemas/RevisionCursor"
+        }
+      }
+    },
+    "headers": {
+      "CurrentProtocol": {
+        "description": "Current protocol version produced by this server (N). For this v1\ncontract the value is `1`.\n",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "MinSupportedProtocol": {
+        "description": "Oldest protocol accepted by this server. For this initial v1 contract\nthe value is `1`; once N is introduced it may become N-1.\n",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "SupportedProtocols": {
+        "description": "Comma-separated protocol versions accepted during the current\ncompatibility window, ordered newest first; for example, `2, 1`.\n",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*(, [1-9][0-9]*)*$"
+        }
+      },
+      "UpgradeLink": {
+        "description": "HTTPS URL for the supported Edge release or upgrade guide.",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "ServerReceivedAt": {
+        "description": "RFC 3339 server timestamp at which the report entered the authoritative\ningestion boundary. The same report-level value is present in the\nacknowledgement body and applies to every event accepted atomically in that\nreport.\n",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "PrivateNoStore": {
+        "description": "Prevents intermediaries from retaining capability-token views.",
+        "schema": {
+          "type": "string",
+          "const": "private, no-store"
+        }
+      },
+      "OfficeRevision": {
+        "description": "Current decimal Office projection revision.",
+        "schema": {
+          "$ref": "#/components/schemas/RevisionCursor"
+        }
+      },
+      "OfficeRevisionEtag": {
+        "description": "Strong ETag derived from the Office projection revision.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\\\"office-(0|[1-9][0-9]*)\\\"$"
+        }
+      }
+    },
+    "schemas": {
+      "RevisionCursor": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "Monotonic non-negative integer that remains exactly representable by\nJavaScript clients. Zero means no Office revision has yet been applied.\n"
+      }
+    },
+    "responses": {
+      "EdgeReportAccepted": {
+        "description": "The report was durably accepted, or was an exact replay from the still-current boot whose original acknowledgement is returned without side effects. A replay from a fenced boot, sequence gaps, partial overlaps, and same-sequence different-content conflicts use a `409` Problem response. Presence is anchored to the authoritative `server_received_at` in the acknowledgement; `idle_stage` remains server-derived.",
+        "headers": {
+          "X-Min-Supported-Protocol": {
+            "$ref": "#/components/headers/MinSupportedProtocol"
+          },
+          "X-Supported-Protocols": {
+            "$ref": "#/components/headers/SupportedProtocols"
+          },
+          "X-Server-Received-At": {
+            "$ref": "#/components/headers/ServerReceivedAt"
+          },
+          "X-Protocol-Version": {
+            "$ref": "#/components/headers/CurrentProtocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "./schemas/edge-report-ack.v1.schema.json"
+            }
+          }
+        }
+      },
+      "BadEdgeReport": {
+        "description": "Malformed envelope, invalid canonical form, or invalid sequence layout.",
+        "headers": {
+          "X-Min-Supported-Protocol": {
+            "$ref": "#/components/headers/MinSupportedProtocol"
+          },
+          "X-Supported-Protocols": {
+            "$ref": "#/components/headers/SupportedProtocols"
+          },
+          "X-Protocol-Version": {
+            "$ref": "#/components/headers/CurrentProtocol"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "UnauthenticatedEdge": {
+        "description": "Device key is unknown or revoked, or the signature is invalid.",
+        "headers": {
+          "X-Min-Supported-Protocol": {
+            "$ref": "#/components/headers/MinSupportedProtocol"
+          },
+          "X-Supported-Protocols": {
+            "$ref": "#/components/headers/SupportedProtocols"
+          },
+          "X-Protocol-Version": {
+            "$ref": "#/components/headers/CurrentProtocol"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "EdgeFenceConflict": {
+        "description": "The report uses a fenced boot, fails the `previous_boot_id`\ncompare-and-swap, reuses a sequence with different content, starts after an\nunexplained sequence gap, or conflicts with the active reporting instance.\nRetrying unchanged content is safe; changing `observed_at`, `sent_at`, or\nsignature does not make a conflicting sequence acceptable.\n",
+        "x-problem-codes": [
+          "stale_boot",
+          "sequence_gap",
+          "sequence_overlap",
+          "sequence_conflict"
+        ],
+        "headers": {
+          "X-Min-Supported-Protocol": {
+            "$ref": "#/components/headers/MinSupportedProtocol"
+          },
+          "X-Supported-Protocols": {
+            "$ref": "#/components/headers/SupportedProtocols"
+          },
+          "X-Protocol-Version": {
+            "$ref": "#/components/headers/CurrentProtocol"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "EdgeBatchTooLarge": {
+        "description": "The bounded event count or encoded request size is exceeded.",
+        "headers": {
+          "X-Min-Supported-Protocol": {
+            "$ref": "#/components/headers/MinSupportedProtocol"
+          },
+          "X-Supported-Protocols": {
+            "$ref": "#/components/headers/SupportedProtocols"
+          },
+          "X-Protocol-Version": {
+            "$ref": "#/components/headers/CurrentProtocol"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "UnprocessableEdgeReport": {
+        "description": "The envelope is structurally valid but violates non-conflict protocol\nsemantics, for example `first_sequence` not matching the first event, a new\nboot whose first event is not a state snapshot, or a display/activity\ncombination forbidden by the declared protocol version. Intra-batch gaps and\noverlaps are sequence conflicts and use `409`, not `422`.\n",
+        "x-problem-codes": [
+          "report_semantics_invalid"
+        ],
+        "headers": {
+          "X-Min-Supported-Protocol": {
+            "$ref": "#/components/headers/MinSupportedProtocol"
+          },
+          "X-Supported-Protocols": {
+            "$ref": "#/components/headers/SupportedProtocols"
+          },
+          "X-Protocol-Version": {
+            "$ref": "#/components/headers/CurrentProtocol"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "UnsupportedProtocol": {
+        "description": "The Edge protocol is older than `X-Min-Supported-Protocol` or newer than\nthe server's current protocol. The local desktop pet must keep running;\nonly Control Plane reporting is unavailable until compatibility is\nrestored.\n",
+        "headers": {
+          "X-Min-Supported-Protocol": {
+            "$ref": "#/components/headers/MinSupportedProtocol"
+          },
+          "X-Supported-Protocols": {
+            "$ref": "#/components/headers/SupportedProtocols"
+          },
+          "X-Upgrade-URL": {
+            "$ref": "#/components/headers/UpgradeLink"
+          },
+          "X-Protocol-Version": {
+            "$ref": "#/components/headers/CurrentProtocol"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "PublicOfficeNotFound": {
+        "description": "Public Office capability is unknown, expired, rotated, or revoked.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Request rate limit exceeded.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds until the caller should retry.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "TemporarilyUnavailable": {
+        "description": "Control Plane is temporarily unable to serve the request.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds until the caller should retry.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,403 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/contracts/schemas/public-office-snapshot.v1.schema.json",
+  "title": "WorkBuddy Buddy Public Office Snapshot v1",
+  "description": "The complete privacy-filtered public projection used by the initial snapshot endpoint and each SSE data event.",
+  "$comment": "office_revision is monotonically increasing within an Office. The SSE event id equals office_revision and its data is one complete instance of this schema, so a client can idempotently replace local state. agents are filtered only by presence_visible; leaderboard and daily_award are filtered independently by stats_opt_in. poster_opt_in is evaluated only by a separate ShareComposition and never broadens either underlying consent. Withdrawing consent advances office_revision and immediately removes the affected data from the next snapshot/SSE; a completed Award is not reassigned, but its public daily_award becomes null when its winner withdraws stats_opt_in. Mount and rank uniqueness, room references, scene-slot uniqueness, deterministic ordering, consent checks, and the equality leaderboard.office_local_date == office.local_date require application validation. public_view_token, consent flags, email, real name, private history, raw Edge events, and device identifiers are deliberately absent.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "office_revision",
+    "generated_at",
+    "office",
+    "rooms",
+    "agents",
+    "leaderboard",
+    "daily_award",
+    "demo_data",
+    "disclaimer"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "office_revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "generated_at": {
+      "$ref": "#/$defs/rfc3339Timestamp"
+    },
+    "office": {
+      "$ref": "#/$defs/publicOffice"
+    },
+    "rooms": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/publicRoom"
+      }
+    },
+    "agents": {
+      "description": "Publicly visible Office Mounts. scene_slot is null for roster-only overflow.",
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/publicAgent"
+      }
+    },
+    "leaderboard": {
+      "$ref": "#/$defs/publicLeaderboard"
+    },
+    "daily_award": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/publicDailyAward"
+        }
+      ]
+    },
+    "demo_data": {
+      "description": "True when this Office is an explicitly labeled simulated demonstration.",
+      "type": "boolean"
+    },
+    "disclaimer": {
+      "const": "趣味统计 · 非考勤依据"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "rfc3339Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "minLength": 20,
+      "maxLength": 35
+    },
+    "publicAlias": {
+      "description": "A chosen public Agent alias, not an email address or real-name field.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^(?!.*@)[^\\r\\n]+$"
+    },
+    "petId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "displayState": {
+      "enum": [
+        "idle",
+        "working",
+        "waiting",
+        "done",
+        "failed"
+      ]
+    },
+    "nullableDisplayState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/displayState"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "idleStage": {
+      "description": "A server-derived stage; never a ranking input supplied by Edge.",
+      "enum": [
+        "none",
+        "fresh",
+        "salted",
+        "costume",
+        "fish"
+      ]
+    },
+    "publicOffice": {
+      "type": "object",
+      "required": [
+        "name",
+        "local_date",
+        "timezone"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[^\\r\\n]+$"
+        },
+        "local_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "timezone": {
+          "description": "An IANA time-zone identifier.",
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z_+-]+(?:/[A-Za-z0-9._+-]+)*$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicRoom": {
+      "type": "object",
+      "required": [
+        "room_id",
+        "name",
+        "scene_capacity"
+      ],
+      "properties": {
+        "room_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[^\\r\\n]+$"
+        },
+        "scene_capacity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicAgent": {
+      "type": "object",
+      "required": [
+        "mount_id",
+        "room_id",
+        "alias",
+        "pet_id",
+        "presence",
+        "display_state",
+        "idle_stage",
+        "scene_slot"
+      ],
+      "properties": {
+        "mount_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "room_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "alias": {
+          "$ref": "#/$defs/publicAlias"
+        },
+        "pet_id": {
+          "$ref": "#/$defs/petId"
+        },
+        "presence": {
+          "enum": [
+            "online",
+            "offline"
+          ]
+        },
+        "display_state": {
+          "$ref": "#/$defs/nullableDisplayState"
+        },
+        "idle_stage": {
+          "$ref": "#/$defs/idleStage"
+        },
+        "scene_slot": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "presence": {
+                "const": "online"
+              }
+            },
+            "required": [
+              "presence"
+            ]
+          },
+          "then": {
+            "properties": {
+              "display_state": {
+                "$ref": "#/$defs/displayState"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "display_state": {
+                "type": "null"
+              },
+              "idle_stage": {
+                "const": "none"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "display_state": {
+                "enum": [
+                  "working",
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "display_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "idle_stage": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "scoreSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "publicRankEntry": {
+      "type": "object",
+      "required": [
+        "rank",
+        "mount_id",
+        "alias",
+        "pet_id",
+        "slacking_seconds"
+      ],
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "mount_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "alias": {
+          "$ref": "#/$defs/publicAlias"
+        },
+        "pet_id": {
+          "$ref": "#/$defs/petId"
+        },
+        "slacking_seconds": {
+          "$ref": "#/$defs/scoreSeconds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicLeaderboard": {
+      "type": "object",
+      "required": [
+        "office_local_date",
+        "status",
+        "as_of",
+        "entries"
+      ],
+      "properties": {
+        "office_local_date": {
+          "description": "The current scoring Office day. It equals office.local_date; a cross-midnight schedule window belongs to the local date on which the window started.",
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "enum": [
+            "provisional",
+            "final"
+          ]
+        },
+        "as_of": {
+          "$ref": "#/$defs/rfc3339Timestamp"
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/publicRankEntry"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicAwardWinner": {
+      "type": "object",
+      "required": [
+        "mount_id",
+        "alias",
+        "pet_id",
+        "slacking_seconds"
+      ],
+      "properties": {
+        "mount_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "alias": {
+          "$ref": "#/$defs/publicAlias"
+        },
+        "pet_id": {
+          "$ref": "#/$defs/petId"
+        },
+        "slacking_seconds": {
+          "$ref": "#/$defs/scoreSeconds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicDailyAward": {
+      "type": "object",
+      "required": [
+        "office_local_date",
+        "awarded_at",
+        "final",
+        "winner"
+      ],
+      "properties": {
+        "office_local_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "awarded_at": {
+          "$ref": "#/$defs/rfc3339Timestamp"
+        },
+        "final": {
+          "const": true
+        },
+        "winner": {
+          "$ref": "#/$defs/publicAwardWinner"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

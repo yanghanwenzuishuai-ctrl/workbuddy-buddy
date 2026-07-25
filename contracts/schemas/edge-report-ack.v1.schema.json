@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/contracts/schemas/edge-report-ack.v1.schema.json",
+  "title": "WorkBuddy Buddy Edge Report Acknowledgement v1",
+  "description": "A successful, server-authored acknowledgement for an accepted or exactly replayed Edge report envelope.",
+  "$comment": "While the acknowledged boot remains current, an exact full-payload replay returns the same acknowledgement values and performs no new presence, lease, interval, or scoring side effects. A replay from a fenced boot is rejected as stale_boot and never returns its old ACK. accepted_through_sequence is scoped to the acknowledged instance and boot. server_received_at is server-authored and is the authoritative accounting boundary. current_protocol and min_supported_protocol describe the responding server, so a v1 Edge can receive future N/N-1 values; application validation enforces 1 <= min_supported_protocol <= current_protocol and the advertised support window.",
+  "type": "object",
+  "required": [
+    "current_protocol",
+    "min_supported_protocol",
+    "instance_id",
+    "boot_id",
+    "accepted_through_sequence",
+    "server_received_at",
+    "lease_expires_at"
+  ],
+  "properties": {
+    "current_protocol": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "min_supported_protocol": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "instance_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "boot_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "accepted_through_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "server_received_at": {
+      "$ref": "#/$defs/rfc3339Timestamp"
+    },
+    "lease_expires_at": {
+      "$ref": "#/$defs/rfc3339Timestamp"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "rfc3339Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "minLength": 20,
+      "maxLength": 35
+    }
+  }
+}

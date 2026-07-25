@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/contracts/schemas/edge-report-envelope.v1.schema.json",
+  "title": "WorkBuddy Buddy Edge Report Envelope v1",
+  "description": "A signed, privacy-safe batch of derived state transitions and heartbeats from one enrolled Agent Instance boot.",
+  "$comment": "Protocol rules that JSON Schema cannot express: a new boot starts at sequence 1, previous_boot_id is null for an Instance's first boot and must otherwise compare-and-swap against the server's current boot, and the first event of a new boot must be a complete state_transition snapshot. first_sequence equals events[0].sequence; event sequences are strictly consecutive and share one namespace across state_transition and heartbeat; the batch is atomic; an exact full-payload replay returns the same acknowledgement without side effects; a reused sequence with a different payload is sequence_conflict; a gap is sequence_gap; a partial overlap is sequence_overlap; and once a new boot is accepted, both known and previously unseen delayed old boots are fenced and cannot affect presence, lease, grace, or scoring. The server assigns server_received_at and uses it as the authoritative accounting boundary. The client must never submit received_at/server_received_at or idle_stage. Signature verification and canonical signing bytes are protocol-level checks rather than schema checks.",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "instance_id",
+    "key_id",
+    "boot_id",
+    "previous_boot_id",
+    "first_sequence",
+    "events",
+    "sent_at",
+    "client_version",
+    "signature"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "instance_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "key_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "boot_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "previous_boot_id": {
+      "description": "Compare-and-swap predecessor. Null only for the first accepted boot of an Instance; every later new boot names the server's current boot. All reports in one boot retain the same value.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "first_sequence": {
+      "$ref": "#/$defs/sequence"
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/stateTransitionEvent"
+          },
+          {
+            "$ref": "#/$defs/heartbeatEvent"
+          }
+        ]
+      }
+    },
+    "sent_at": {
+      "$ref": "#/$defs/rfc3339Timestamp"
+    },
+    "client_version": {
+      "$ref": "#/$defs/semanticVersion"
+    },
+    "signature": {
+      "$ref": "#/$defs/ed25519Signature"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "rfc3339Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "minLength": 20,
+      "maxLength": 35
+    },
+    "semanticVersion": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "petId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "ed25519Signature": {
+      "description": "Standard Base64 encoding of a 64-byte Ed25519 signature.",
+      "type": "string",
+      "minLength": 88,
+      "maxLength": 88,
+      "pattern": "^[A-Za-z0-9+/]{86}==$",
+      "contentEncoding": "base64"
+    },
+    "displayState": {
+      "enum": [
+        "idle",
+        "working",
+        "waiting",
+        "done",
+        "failed"
+      ]
+    },
+    "activityState": {
+      "enum": [
+        "unknown",
+        "active",
+        "eligible_idle",
+        "waiting",
+        "failed"
+      ]
+    },
+    "stateTransitionEvent": {
+      "type": "object",
+      "required": [
+        "sequence",
+        "kind",
+        "observed_at",
+        "display_state",
+        "activity_state",
+        "pet_id"
+      ],
+      "properties": {
+        "sequence": {
+          "$ref": "#/$defs/sequence"
+        },
+        "kind": {
+          "const": "state_transition"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/rfc3339Timestamp"
+        },
+        "display_state": {
+          "$ref": "#/$defs/displayState"
+        },
+        "activity_state": {
+          "$ref": "#/$defs/activityState"
+        },
+        "pet_id": {
+          "$ref": "#/$defs/petId"
+        }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "display_state": {
+              "const": "idle"
+            },
+            "activity_state": {
+              "enum": [
+                "unknown",
+                "eligible_idle"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "display_state": {
+              "const": "working"
+            },
+            "activity_state": {
+              "const": "active"
+            }
+          }
+        },
+        {
+          "properties": {
+            "display_state": {
+              "const": "waiting"
+            },
+            "activity_state": {
+              "enum": [
+                "waiting",
+                "active",
+                "eligible_idle"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "display_state": {
+              "const": "done"
+            },
+            "activity_state": {
+              "const": "eligible_idle"
+            }
+          }
+        },
+        {
+          "properties": {
+            "display_state": {
+              "const": "failed"
+            },
+            "activity_state": {
+              "const": "failed"
+            }
+          }
+        }
+      ]
+    },
+    "heartbeatEvent": {
+      "type": "object",
+      "required": [
+        "sequence",
+        "kind",
+        "observed_at"
+      ],
+      "properties": {
+        "sequence": {
+          "$ref": "#/$defs/sequence"
+        },
+        "kind": {
+          "const": "heartbeat"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/rfc3339Timestamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "heartbeatEnvelope": {
+      "title": "WorkBuddy Buddy Edge Heartbeat Envelope v1",
+      "$comment": "The heartbeat endpoint accepts exactly one heartbeat event, but that event still consumes the same per-boot sequence namespace as state transitions. first_sequence must equal the heartbeat sequence; this equality is enforced by the server.",
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "instance_id",
+        "key_id",
+        "boot_id",
+        "previous_boot_id",
+        "first_sequence",
+        "events",
+        "sent_at",
+        "client_version",
+        "signature"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": 1
+        },
+        "instance_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "key_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "boot_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "previous_boot_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "first_sequence": {
+          "$ref": "#/$defs/sequence"
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/heartbeatEvent"
+            }
+          ],
+          "items": false
+        },
+        "sent_at": {
+          "$ref": "#/$defs/rfc3339Timestamp"
+        },
+        "client_version": {
+          "$ref": "#/$defs/semanticVersion"
+        },
+        "signature": {
+          "$ref": "#/$defs/ed25519Signature"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
