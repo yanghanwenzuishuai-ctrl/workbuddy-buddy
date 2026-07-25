@@ -8,3 +8,4 @@ __pycache__/
 
 # node contract-test dependencies
 node_modules/
+/apps/control-plane/dist/

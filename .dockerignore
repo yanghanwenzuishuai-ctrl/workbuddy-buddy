@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+target
+apps/control-plane/dist
+backups
+pet-packs
+previews
+reports
+tmp
+tools
+*.zip
+*.mp4
+frontend/pets
+src-tauri
+crates
+hooks

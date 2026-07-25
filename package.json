@@ -1,13 +1,20 @@
 {
-  "name": "workbuddy-buddy-contracts",
+  "name": "workbuddy-buddy",
   "private": true,
   "version": "0.0.0",
+  "workspaces": [
+    "apps/control-plane"
+  ],
   "engines": {
     "node": ">=22.12"
   },
   "scripts": {
     "lint:openapi": "redocly lint --extends minimal --skip-rule security-defined contracts/openapi.json",
-    "test:contracts": "npm run lint:openapi && node --test contracts/tests/*.test.mjs"
+    "test:contracts": "npm run lint:openapi && node --test contracts/tests/*.test.mjs",
+    "typecheck:control-plane": "npm run typecheck --workspace @workbuddy-buddy/control-plane",
+    "test:control-plane": "npm run test --workspace @workbuddy-buddy/control-plane",
+    "test:control-plane:integration": "npm run test:integration --workspace @workbuddy-buddy/control-plane",
+    "migrate:control-plane": "npm run db:migrate --workspace @workbuddy-buddy/control-plane"
   },
   "devDependencies": {
     "@redocly/cli": "2.40.0",

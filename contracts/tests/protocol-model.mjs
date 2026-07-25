@@ -100,6 +100,12 @@ export class ProtocolAcceptanceModel {
     let boot = instance.boots.get(envelope.boot_id);
     if (instance.currentBoot !== envelope.boot_id) {
       if (boot) return problem("stale_boot");
+      if (
+        envelope.previous_boot_id !==
+        (instance.currentBoot ?? this.policy.boot_fencing.initial_previous_boot_id)
+      ) {
+        return problem(this.policy.boot_fencing.mismatch_problem_code);
+      }
       if (envelope.first_sequence !== this.policy.batch.sequence_starts_at) {
         return problem("sequence_gap", {
           expected_sequence: this.policy.batch.sequence_starts_at,
@@ -107,12 +113,6 @@ export class ProtocolAcceptanceModel {
       }
       if (events[0].kind !== this.policy.boot_fencing.new_boot_first_event_kind) {
         return problem("report_semantics_invalid");
-      }
-      if (
-        envelope.previous_boot_id !==
-        (instance.currentBoot ?? this.policy.boot_fencing.initial_previous_boot_id)
-      ) {
-        return problem(this.policy.boot_fencing.mismatch_problem_code);
       }
       boot = {
         generation: instance.generation + 1,

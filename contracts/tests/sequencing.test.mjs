@@ -179,6 +179,16 @@ test("a delayed unseen boot cannot reverse-fence the current boot", async () => 
     ok: false,
     code: "stale_boot",
   });
+  assert.deepEqual(
+    model.accept(
+      envelope(BOOT_C, [state(2)], { previous_boot_id: BOOT_A }),
+      4_000,
+    ),
+    {
+      ok: false,
+      code: "stale_boot",
+    },
+  );
   assert.deepEqual(model.inspect(INSTANCE), beforeDelayedBoot);
 });
 
