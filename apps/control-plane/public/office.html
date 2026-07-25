@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="referrer" content="no-referrer">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#08131d">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'"
+    >
+    <link rel="icon" href="data:,">
+    <title>WorkBuddy 咸鱼办公室</title>
+    <link rel="stylesheet" href="/office.css">
+    <script src="/office.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">🐟</div>
+          <div>
+            <p class="eyebrow">WORKBUDDY BUDDY</p>
+            <h1 id="office-name">咸鱼办公室</h1>
+          </div>
+        </div>
+
+        <div class="live-meta">
+          <div id="connection-state" class="connection-state is-connecting" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="connection-label">正在进入办公室</span>
+          </div>
+          <p id="office-clock" class="office-clock">--:--</p>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section class="office-card" aria-labelledby="scene-heading">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">LIVE OFFICE</p>
+              <h2 id="scene-heading">办公室实时状态</h2>
+            </div>
+            <div class="scene-stats" aria-label="办公室在线信息">
+              <span><strong id="online-count">0</strong> 在线</span>
+              <span><strong id="revision-label">#0</strong> 版本</span>
+            </div>
+          </div>
+
+          <div id="rooms" class="rooms" aria-live="polite">
+            <div class="loading-room">
+              <div class="loading-fish" aria-hidden="true">🐟</div>
+              <p>正在布置工位…</p>
+            </div>
+          </div>
+
+          <div class="scene-footer">
+            <span id="office-date">今日</span>
+            <span>趣味统计 · 非考勤依据</span>
+          </div>
+        </section>
+
+        <aside class="sidebar" aria-label="今日咸鱼榜">
+          <section class="champion-card" aria-labelledby="champion-heading">
+            <div class="champion-glow" aria-hidden="true"></div>
+            <p id="champion-kicker" class="champion-kicker">今日咸鱼王</p>
+            <div id="champion-pet" class="champion-pet" aria-hidden="true">🐟</div>
+            <h2 id="champion-heading">等待第一位选手</h2>
+            <p id="champion-score" class="champion-score">摸鱼时长 0 分钟</p>
+            <span id="champion-badge" class="champion-badge">实时评选中</span>
+          </section>
+
+          <section class="leaderboard-card" aria-labelledby="leaderboard-heading">
+            <div class="leaderboard-header">
+              <div>
+                <p class="eyebrow">TODAY</p>
+                <h2 id="leaderboard-heading">实时咸鱼榜</h2>
+              </div>
+              <span id="leaderboard-status" class="leaderboard-status">暂定</span>
+            </div>
+            <ol id="leaderboard" class="leaderboard">
+              <li class="leaderboard-empty">正在统计摸鱼浓度…</li>
+            </ol>
+            <p id="leaderboard-time" class="leaderboard-time">数据更新时间 --:--</p>
+          </section>
+
+          <section class="stage-legend" aria-label="摸鱼形态说明">
+            <span><b>🐟</b> 新鲜鱼</span>
+            <span><b>🧂</b> 咸鱼</span>
+            <span><b>🥋</b> 咸鱼装</span>
+            <span><b>💤</b> 躺平</span>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="recording-footer">
+        <span>workbuddy-buddy</span>
+        <span id="generated-at">等待实时数据</span>
+      </footer>
+    </div>
+
+    <div id="notice" class="notice" role="alert" aria-live="assertive" hidden></div>
+  </body>
+</html>

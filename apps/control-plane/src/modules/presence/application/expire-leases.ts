@@ -1,11 +1,13 @@
-import { randomUUID } from "node:crypto";
-
 import type { QueryResultRow } from "pg";
 
 import type {
   DatabaseClient,
   DatabasePool,
 } from "../../../platform/db/pool.js";
+import {
+  createPublicOfficeProjector,
+  type PublicOfficeProjector,
+} from "../../public-office/application/public-office-projector.js";
 import { MAX_SAFE_SEQUENCE } from "../domain/types.js";
 
 interface CandidateRow extends QueryResultRow {
@@ -18,22 +20,19 @@ interface InstanceRow extends QueryResultRow {
 
 interface PresenceRow extends QueryResultRow {
   last_accepted_sequence: string;
-  pet_id: string;
   lease_expires_at: Date;
   lease_closed_at: Date | null;
 }
 
 interface MountRow extends QueryResultRow {
-  id: string;
   office_id: string;
-  room_id: string;
-  scene_slot: number | null;
-  alias: string;
 }
 
 export async function expireDueLeases(
   pool: DatabasePool,
   limit = 100,
+  publicOfficeProjector: PublicOfficeProjector =
+    createPublicOfficeProjector(),
 ): Promise<number> {
   if (!Number.isInteger(limit) || limit < 1 || limit > 1_000) {
     throw new Error("Lease sweep limit must be between 1 and 1000");
@@ -50,7 +49,15 @@ export async function expireDueLeases(
 
   let expired = 0;
   for (const candidate of candidates.rows) {
-    if (await expireOneLease(pool, candidate.instance_id)) expired += 1;
+    if (
+      await expireOneLease(
+        pool,
+        candidate.instance_id,
+        publicOfficeProjector,
+      )
+    ) {
+      expired += 1;
+    }
   }
   return expired;
 }
@@ -58,6 +65,7 @@ export async function expireDueLeases(
 async function expireOneLease(
   pool: DatabasePool,
   instanceId: string,
+  publicOfficeProjector: PublicOfficeProjector,
 ): Promise<boolean> {
   const client = await pool.connect();
   try {
@@ -91,7 +99,7 @@ async function expireOneLease(
       [instanceId],
     );
     const presenceResult = await client.query<PresenceRow>(
-      `SELECT last_accepted_sequence, pet_id,
+      `SELECT last_accepted_sequence,
               lease_expires_at, lease_closed_at
          FROM control_plane.current_presence
         WHERE instance_id = $1
@@ -131,9 +139,9 @@ async function expireOneLease(
     );
     await appendOfflineOfficeRevisions(
       client,
+      publicOfficeProjector,
       instance.logical_agent_id,
       instanceId,
-      presence.pet_id,
       presence.lease_expires_at,
     );
     await client.query("COMMIT");
@@ -159,19 +167,18 @@ async function leaseIsDue(
 
 async function appendOfflineOfficeRevisions(
   client: DatabaseClient,
+  publicOfficeProjector: PublicOfficeProjector,
   logicalAgentId: string,
   instanceId: string,
-  petId: string,
   leaseExpiresAt: Date,
 ): Promise<void> {
   const mounts = await client.query<MountRow>(
-    `SELECT m.id, m.office_id, m.room_id, m.scene_slot, a.alias
+    `SELECT m.office_id
        FROM control_plane.agent_office_mounts m
-       JOIN control_plane.logical_agents a ON a.id = m.logical_agent_id
        JOIN control_plane.offices o ON o.id = m.office_id
       WHERE m.logical_agent_id = $1
         AND m.active
-        AND m.presence_visible
+        AND (m.presence_visible OR m.stats_opt_in)
       ORDER BY m.office_id
       FOR UPDATE OF o`,
     [logicalAgentId],
@@ -179,49 +186,14 @@ async function appendOfflineOfficeRevisions(
   const sourceKey = `lease:${instanceId}:${leaseExpiresAt.toISOString()}`;
 
   for (const mount of mounts.rows) {
-    const revisionResult = await client.query<{ revision: string }>(
-      `UPDATE control_plane.offices
-          SET revision = revision + 1
-        WHERE id = $1
-        RETURNING revision`,
-      [mount.office_id],
-    );
-    const revision = parseSafeSequence(revisionResult.rows[0]?.revision, true);
-    const publicPayload = {
-      mount_id: mount.id,
-      room_id: mount.room_id,
-      alias: mount.alias,
-      pet_id: petId,
-      presence: "offline",
-      display_state: null,
-      idle_stage: "none",
-      scene_slot: mount.scene_slot,
-    };
-    await client.query(
-      `INSERT INTO control_plane.office_revision_events (
-         office_id, revision, event_type, public_payload, created_at
-       ) VALUES ($1, $2, 'presence_removed', $3, $4)`,
-      [mount.office_id, revision, publicPayload, leaseExpiresAt],
-    );
-    await client.query(
-      `INSERT INTO control_plane.domain_outbox (
-         id, office_id, office_revision,
-         source_kind, source_key, source_receipt_id,
-         effect_kind, public_payload, created_at
-       ) VALUES (
-         $1, $2, $3,
-         'lease_expiry', $4, NULL,
-         'office_revision', $5, $6
-       )`,
-      [
-        randomUUID(),
-        mount.office_id,
-        revision,
-        sourceKey,
-        publicPayload,
-        leaseExpiresAt,
-      ],
-    );
+    await publicOfficeProjector.recordRevision(client, {
+      officeId: mount.office_id,
+      eventType: "presence_removed",
+      sourceKind: "lease_expiry",
+      sourceKey,
+      sourceReceiptId: null,
+      at: leaseExpiresAt,
+    });
   }
 }
 

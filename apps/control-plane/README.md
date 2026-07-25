@@ -16,6 +16,9 @@ The default container exposes:
 - `GET /readyz`: PostgreSQL connectivity and migration readiness.
 - `POST /api/v1/edge/events:batch`
 - `POST /api/v1/edge/heartbeat`
+- `GET /api/v1/offices/:public_view_token/snapshot`
+- `GET /api/v1/offices/:public_view_token/events`
+- `GET /o/:public_view_token`: responsive Public Office page
 
 Edge writes are disabled unless a verifier is installed. For local fake-edge
 work only, run the service outside production with
@@ -28,6 +31,11 @@ ALLOW_UNVERIFIED_FAKE_EDGE=true npm run dev --workspace @workbuddy-buddy/control
 npm run dev:fake-edge --workspace @workbuddy-buddy/control-plane
 ```
 
+The seed prints its deterministic local-only Public Office URL. The page uses
+the immutable Snapshot as its initial state and reconnects to the SSE stream
+from that exact Office revision. Its layout is recording-safe at desktop,
+9:16, and 3:4 viewports and loads no third-party resources.
+
 The development verifier still requires a non-revoked database credential
 bound to the active reporting instance. It only bypasses Ed25519 verification;
 the bypass refuses to start when `NODE_ENV=production`.
@@ -36,6 +44,42 @@ Production startup does not run DDL by default. Run `db:migrate` as an
 explicit release step with a migration-capable database role, then start the
 service with a runtime role. `MIGRATE_ON_START=true` is intended for local
 development and single-user self-hosting only.
+
+## Public Office guarantees
+
+- Every published revision stores one complete, schema-validated canonical
+  Snapshot. Snapshot bytes, the strong ETag, and an SSE replay frame cannot
+  drift after publication.
+- Public view capabilities are random 256-bit values. PostgreSQL stores only
+  their SHA-256 digest; malformed, unknown, expired, rotated, and revoked
+  values share the same no-store 404 response.
+- Scene presence and statistics consent are independent. Lowering any consent
+  creates a removal revision and invalidates unsafe historical replay.
+- SSE replay holds a short shared database lock while each page of events is
+  queued, so consent withdrawal or token revocation has a defined ordering
+  with disclosure. Replays are bounded by revision count and a 1 MiB page
+  budget; slow clients are disconnected.
+- Scoring intersects server-derived eligible-idle activity, the active Lease,
+  Mount statistics consent, and the materialized Office schedule. Each
+  continuous intersection pays its own 15-minute grace. Overlapping source
+  intervals are rejected and query-side intersections are merged defensively.
+- A 30-second projection tick advances time-derived stages and rankings.
+  Completed Office days are settled exactly once into an immutable winner or
+  explicit `no_award`; zero-score days never receive a random winner.
+- All capability-path responses are `private, no-store`. The share page sends
+  `Referrer-Policy: no-referrer`, a same-origin CSP, and never inserts public
+  values as HTML.
+
+Important runtime settings:
+
+- `PUBLIC_PROJECTION_TICK_SECONDS` (default `30`)
+- `PUBLIC_REPLAY_MAX_REVISIONS` (default `256`)
+- `PUBLIC_RETENTION_INTERVAL_SECONDS` (default `60`)
+- `TRUST_PROXY_HOPS` (default `0`; set only for a verified ingress topology)
+
+The account/member management API, Agent Mail identity challenge, real Edge
+enrollment/signatures, and poster/short-video export pipeline remain separate
+follow-up milestones. Agent Mail is not used as an unattended bearer token.
 
 ## Verification
 

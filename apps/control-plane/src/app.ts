@@ -5,6 +5,24 @@ import Fastify, {
 } from "fastify";
 
 import type { ControlPlaneConfig } from "./config.js";
+import { registerPublicOfficePage } from "./public-office-page.js";
+import {
+  createNoopOfficeRevisionBroker,
+  type OfficeRevisionBroker,
+} from "./modules/public-office/application/office-revision-broker.js";
+import {
+  createPublicOfficeProjector,
+  type PublicOfficeProjector,
+} from "./modules/public-office/application/public-office-projector.js";
+import {
+  createPublicOfficeReader,
+  type PublicOfficeReader,
+} from "./modules/public-office/application/public-office-reader.js";
+import { registerPublicOfficeRoutes } from "./modules/public-office/application/public-office-routes.js";
+import {
+  createPublicRateLimiter,
+  type PublicRateLimiter,
+} from "./modules/public-office/application/public-rate-limiter.js";
 import {
   DisabledEdgeVerifier,
   type EdgeVerifier,
@@ -25,6 +43,10 @@ export interface BuildAppOptions {
   validator: EdgeReportValidator;
   verifier?: EdgeVerifier;
   ingestor?: EdgeReportIngestor;
+  publicOfficeProjector?: PublicOfficeProjector;
+  publicOfficeReader?: PublicOfficeReader;
+  officeRevisionBroker?: OfficeRevisionBroker;
+  publicRateLimiter?: PublicRateLimiter;
   logger?: boolean;
 }
 
@@ -33,13 +55,20 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     logger: options.logger ?? false,
     bodyLimit: options.config.maxRequestBytes,
     logController: new LogController({ disableRequestLogging: true }),
+    trustProxy:
+      options.config.trustProxyHops === 0
+        ? false
+        : options.config.trustProxyHops,
   });
   const verifier = options.verifier ?? new DisabledEdgeVerifier();
+  const publicOfficeProjector =
+    options.publicOfficeProjector ?? createPublicOfficeProjector();
   const ingestor =
     options.ingestor ??
     createEdgeReportIngestor(
       options.pool,
       options.config.presenceLeaseTtlSeconds,
+      publicOfficeProjector,
     );
 
   app.get("/livez", async () => ({ status: "ok" }));
@@ -60,6 +89,13 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   registerEdgeRoute(app, "/api/v1/edge/events:batch", "batch");
   registerEdgeRoute(app, "/api/v1/edge/heartbeat", "heartbeat");
+  registerPublicOfficeRoutes(app, {
+    reader: options.publicOfficeReader ?? createPublicOfficeReader(options.pool),
+    broker:
+      options.officeRevisionBroker ?? createNoopOfficeRevisionBroker(),
+    rateLimiter: options.publicRateLimiter ?? createPublicRateLimiter(),
+  });
+  registerPublicOfficePage(app);
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ProtocolProblem) {

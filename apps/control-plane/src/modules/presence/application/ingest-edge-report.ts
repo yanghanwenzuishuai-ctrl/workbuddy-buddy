@@ -6,7 +6,10 @@ import type {
   DatabaseClient,
   DatabasePool,
 } from "../../../platform/db/pool.js";
-import { deriveIdleStage } from "../domain/idle-stage.js";
+import {
+  createPublicOfficeProjector,
+  type PublicOfficeProjector,
+} from "../../public-office/application/public-office-projector.js";
 import { ProtocolProblem } from "../domain/problem.js";
 import {
   MAX_SAFE_SEQUENCE,
@@ -95,12 +98,8 @@ interface MutablePresence {
   eligibleSince: Date | null;
 }
 
-interface MountRow extends QueryResultRow {
-  id: string;
+interface AffectedOfficeRow extends QueryResultRow {
   office_id: string;
-  room_id: string;
-  scene_slot: number | null;
-  alias: string;
 }
 
 export interface EdgeReportIngestor {
@@ -113,6 +112,8 @@ export interface EdgeReportIngestor {
 export function createEdgeReportIngestor(
   pool: DatabasePool,
   leaseTtlSeconds: number,
+  publicOfficeProjector: PublicOfficeProjector =
+    createPublicOfficeProjector(),
 ): EdgeReportIngestor {
   return {
     async ingest(
@@ -131,6 +132,7 @@ export function createEdgeReportIngestor(
           report,
           verified,
           leaseTtlSeconds,
+          publicOfficeProjector,
         );
         await client.query("COMMIT");
         return ack;
@@ -154,6 +156,7 @@ async function ingestInTransaction(
   report: PreparedEdgeReport,
   verified: VerifiedEdgeContext,
   leaseTtlSeconds: number,
+  publicOfficeProjector: PublicOfficeProjector,
 ): Promise<EdgeReportAck> {
   const { envelope } = report;
   const instance = await lockInstance(client, verified.instanceId);
@@ -303,6 +306,9 @@ async function ingestInTransaction(
     );
   }
 
+  // The Office lock is the settlement watermark: a tick either observes this
+  // report's commit, or completes before this report receives its server time.
+  const lockedOfficeIds = await lockAffectedOffices(client, agent.id);
   const serverReceivedAt = await nextServerReceivedAt(client, head);
   const leaseExpiresAt = new Date(
     serverReceivedAt.getTime() + leaseTtlSeconds * 1_000,
@@ -412,9 +418,9 @@ async function ingestInTransaction(
 
   await appendOfficeRevisionEvents(
     client,
+    publicOfficeProjector,
     receiptId,
-    agent,
-    updatedPresence,
+    lockedOfficeIds,
     serverReceivedAt,
   );
 
@@ -631,6 +637,25 @@ async function nextServerReceivedAt(
     throw new Error("Database did not provide server_received_at");
   }
   return receivedAt;
+}
+
+async function lockAffectedOffices(
+  client: DatabaseClient,
+  logicalAgentId: string,
+): Promise<string[]> {
+  const offices = await client.query<AffectedOfficeRow>(
+    `SELECT office.id AS office_id
+       FROM control_plane.agent_office_mounts mount
+       JOIN control_plane.offices office
+         ON office.id = mount.office_id
+      WHERE mount.logical_agent_id = $1
+        AND mount.active
+        AND (mount.presence_visible OR mount.stats_opt_in)
+      ORDER BY office.id
+      FOR UPDATE OF office`,
+    [logicalAgentId],
+  );
+  return offices.rows.map((office) => office.office_id);
 }
 
 async function lockPresence(
@@ -1065,71 +1090,20 @@ async function savePresence(
 
 async function appendOfficeRevisionEvents(
   client: DatabaseClient,
+  publicOfficeProjector: PublicOfficeProjector,
   receiptId: string,
-  agent: AgentRow,
-  presence: MutablePresence,
+  lockedOfficeIds: readonly string[],
   serverReceivedAt: Date,
 ): Promise<void> {
-  const mounts = await client.query<MountRow>(
-    `SELECT m.id, m.office_id, m.room_id, m.scene_slot, a.alias
-       FROM control_plane.agent_office_mounts m
-       JOIN control_plane.logical_agents a ON a.id = m.logical_agent_id
-       JOIN control_plane.offices o ON o.id = m.office_id
-      WHERE m.logical_agent_id = $1
-        AND m.active
-        AND m.presence_visible
-      ORDER BY m.office_id
-      FOR UPDATE OF o`,
-    [agent.id],
-  );
-
-  for (const mount of mounts.rows) {
-    const revisionResult = await client.query<{ revision: string }>(
-      `UPDATE control_plane.offices
-          SET revision = revision + 1
-        WHERE id = $1
-        RETURNING revision`,
-      [mount.office_id],
-    );
-    const revision = parseSafeInteger(
-      revisionResult.rows[0]?.revision,
-      "office revision",
-    );
-    const publicPayload = {
-      mount_id: mount.id,
-      room_id: mount.room_id,
-      alias: mount.alias,
-      pet_id: presence.petId,
-      presence: "online",
-      display_state: presence.displayState,
-      idle_stage: deriveIdleStage(presence.eligibleSince, serverReceivedAt),
-      scene_slot: mount.scene_slot,
-    };
-    await client.query(
-      `INSERT INTO control_plane.office_revision_events (
-         office_id, revision, event_type, public_payload, created_at
-       ) VALUES ($1, $2, 'presence_changed', $3, $4)`,
-      [mount.office_id, revision, publicPayload, serverReceivedAt],
-    );
-    await client.query(
-      `INSERT INTO control_plane.domain_outbox (
-         id, office_id, office_revision,
-         source_kind, source_key, source_receipt_id,
-         effect_kind, public_payload, created_at
-       ) VALUES (
-         $1, $2, $3,
-         'edge_receipt', $4::text, $4::uuid,
-         'office_revision', $5, $6
-       )`,
-      [
-        randomUUID(),
-        mount.office_id,
-        revision,
-        receiptId,
-        publicPayload,
-        serverReceivedAt,
-      ],
-    );
+  for (const officeId of lockedOfficeIds) {
+    await publicOfficeProjector.recordRevision(client, {
+      officeId,
+      eventType: "presence_changed",
+      sourceKind: "edge_receipt",
+      sourceKey: receiptId,
+      sourceReceiptId: receiptId,
+      at: serverReceivedAt,
+    });
   }
 }
 

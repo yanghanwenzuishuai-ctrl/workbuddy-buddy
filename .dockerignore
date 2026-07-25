@@ -11,7 +11,9 @@ tmp
 tools
 *.zip
 *.mp4
-frontend/pets
+frontend/pets/index.json
+frontend/pets/*/pet.json
+frontend/pets/*/spritesheet.png
 src-tauri
 crates
 hooks

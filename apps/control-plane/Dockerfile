@@ -20,7 +20,9 @@ COPY apps/control-plane/package.json apps/control-plane/package.json
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 COPY contracts contracts
+COPY frontend/pets frontend/pets
 COPY apps/control-plane/migrations apps/control-plane/migrations
+COPY apps/control-plane/public apps/control-plane/public
 COPY --from=build /workspace/apps/control-plane/dist apps/control-plane/dist
 
 USER node

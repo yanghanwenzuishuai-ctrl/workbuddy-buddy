@@ -1,8 +1,14 @@
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { loadConfig } from "../../src/config.js";
+import {
+  createPublicOfficeProjector,
+  type PublicOfficeProjector,
+} from "../../src/modules/public-office/application/public-office-projector.js";
+import { tickPublicOffices } from "../../src/modules/public-office/application/tick-public-offices.js";
 import {
   createEdgeReportIngestor,
   type EdgeReportIngestor,
@@ -58,6 +64,7 @@ if (testDatabaseUrl === undefined) {
     let pool: DatabasePool;
     let validator: EdgeReportValidator;
     let ingestor: EdgeReportIngestor;
+    let projector: PublicOfficeProjector;
     let topology: TestTopology;
 
     before(async () => {
@@ -66,7 +73,8 @@ if (testDatabaseUrl === undefined) {
       await migrate(pool, config.migrationsDir);
       await migrate(pool, config.migrationsDir);
       validator = await createEdgeReportValidator(config.contractsDir);
-      ingestor = createEdgeReportIngestor(pool, 90);
+      projector = createPublicOfficeProjector();
+      ingestor = createEdgeReportIngestor(pool, 90, projector);
     });
 
     after(async () => {
@@ -220,6 +228,141 @@ if (testDatabaseUrl === undefined) {
         revisions: 1,
         outbox: 1,
       });
+    });
+
+    test("stats-only Mounts still advance the full public projection", async () => {
+      await pool.query(
+        `UPDATE control_plane.agent_office_mounts
+            SET presence_visible = false
+          WHERE id = $1`,
+        [topology.mount],
+      );
+      await accept(
+        ingestor,
+        topology,
+        prepare(
+          validator,
+          topology,
+          "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          null,
+          [state(1)],
+        ),
+      );
+
+      const projection = await pool.query<{
+        revision: string;
+        snapshot_payload: {
+          agents: unknown[];
+          leaderboard: { entries: unknown[] };
+        };
+      }>(
+        `SELECT revision::text, snapshot_payload
+           FROM control_plane.office_current_public_projections
+          WHERE office_id = $1`,
+        [topology.office],
+      );
+      assert.equal(projection.rows[0]?.revision, "1");
+      assert.deepEqual(projection.rows[0]?.snapshot_payload.agents, []);
+      assert.deepEqual(
+        projection.rows[0]?.snapshot_payload.leaderboard.entries,
+        [],
+      );
+    });
+
+    test("a pre-close heartbeat blocked in-flight is committed before Daily Award settlement", async () => {
+      const boot = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const firstAck = await accept(
+        ingestor,
+        topology,
+        prepare(validator, topology, boot, null, [state(1)]),
+      );
+      const window = await seedClosingSettlementWindow(
+        pool,
+        topology,
+        new Date(firstAck.server_received_at),
+      );
+      const report = prepare(
+        validator,
+        topology,
+        boot,
+        null,
+        [heartbeat(2)],
+      );
+      const receiptBlocker = await pool.connect();
+      let blockerActive = false;
+      let delayedReport: ReturnType<typeof accept> | undefined;
+      let settlement: Promise<number> | undefined;
+
+      try {
+        await receiptBlocker.query("BEGIN");
+        blockerActive = true;
+        await receiptBlocker.query(
+          "LOCK TABLE control_plane.edge_report_receipts IN ACCESS EXCLUSIVE MODE",
+        );
+
+        delayedReport = accept(ingestor, topology, report);
+        await waitForWaitingQuery(
+          pool,
+          "INSERT INTO control_plane.edge_report_receipts",
+        );
+        const beforeClose = await pool.query<{ before_close: boolean }>(
+          "SELECT clock_timestamp() < $1::timestamptz AS before_close",
+          [window.closesAt],
+        );
+        assert.equal(
+          beforeClose.rows[0]?.before_close,
+          true,
+          "the legal heartbeat must reach ingestion before the Office closes",
+        );
+
+        await delay(Math.max(0, window.closesAt.getTime() - Date.now() + 25));
+        settlement = tickPublicOffices(
+          pool,
+          projector,
+          new Date(window.closesAt.getTime() + 1),
+          5,
+        );
+        await waitForWaitingQuery(pool, "FOR UPDATE OF office");
+
+        await receiptBlocker.query("COMMIT");
+        blockerActive = false;
+        const delayedAck = await delayedReport;
+        assert.ok(
+          new Date(delayedAck.server_received_at).getTime() <
+            window.closesAt.getTime(),
+          "the heartbeat received before close must remain part of that Office day",
+        );
+        assert.equal(await settlement, 1);
+
+        const result = await pool.query<{
+          outcome: string;
+          winner_mount_id: string;
+          winner_slacking_seconds: string;
+        }>(
+          `SELECT
+             outcome,
+             winner_mount_id,
+             winner_slacking_seconds::text
+           FROM control_plane.office_day_results
+          WHERE office_id = $1
+            AND office_local_date = $2::date`,
+          [topology.office, window.officeLocalDate],
+        );
+        assert.deepEqual(result.rows[0], {
+          outcome: "winner",
+          winner_mount_id: topology.mount,
+          winner_slacking_seconds: "900",
+        });
+      } finally {
+        if (blockerActive) {
+          await receiptBlocker.query("ROLLBACK").catch(() => undefined);
+        }
+        receiptBlocker.release();
+        const pendingOperations: Promise<unknown>[] = [];
+        if (delayedReport !== undefined) pendingOperations.push(delayedReport);
+        if (settlement !== undefined) pendingOperations.push(settlement);
+        await Promise.allSettled(pendingOperations);
+      }
     });
 
     test("exact replay returns the stored ACK without renewing lease or emitting outbox", async () => {
@@ -599,9 +742,17 @@ if (testDatabaseUrl === undefined) {
       assert.equal(interval.rows[0]?.close_reason, "lease_expired");
       const offlineEvent = await pool.query<{
         event_type: string;
-        public_payload: { presence: string; display_state: null };
+        projection_format_version: number;
+        public_payload: {
+          office_revision: number;
+          agents: Array<{
+            mount_id: string;
+            presence: string;
+            display_state: null;
+          }>;
+        };
       }>(
-        `SELECT event_type, public_payload
+        `SELECT event_type, projection_format_version, public_payload
            FROM control_plane.office_revision_events
           WHERE office_id = $1
           ORDER BY revision DESC
@@ -609,10 +760,14 @@ if (testDatabaseUrl === undefined) {
         [topology.office],
       );
       assert.equal(offlineEvent.rows[0]?.event_type, "presence_removed");
+      assert.equal(offlineEvent.rows[0]?.projection_format_version, 1);
+      const offlineAgent = offlineEvent.rows[0]?.public_payload.agents.find(
+        (agent) => agent.mount_id === topology.mount,
+      );
       assert.deepEqual(
         {
-          presence: offlineEvent.rows[0]?.public_payload.presence,
-          display_state: offlineEvent.rows[0]?.public_payload.display_state,
+          presence: offlineAgent?.presence,
+          display_state: offlineAgent?.display_state,
         },
         { presence: "offline", display_state: null },
       );
@@ -823,6 +978,142 @@ async function seedTopology(pool: DatabasePool): Promise<TestTopology> {
   } finally {
     client.release();
   }
+}
+
+interface ClosingSettlementWindow {
+  officeLocalDate: string;
+  closesAt: Date;
+}
+
+async function seedClosingSettlementWindow(
+  pool: DatabasePool,
+  topology: TestTopology,
+  firstReceivedAt: Date,
+): Promise<ClosingSettlementWindow> {
+  const timing = await pool.query<{
+    office_local_date: string;
+    closes_at: Date;
+  }>(
+    `SELECT
+       (closing.closes_at AT TIME ZONE 'UTC')::date::text
+         AS office_local_date,
+       closing.closes_at
+     FROM (
+       SELECT date_trunc(
+         'milliseconds',
+         GREATEST(
+           clock_timestamp() + interval '8 seconds',
+           $1::timestamptz + interval '8 seconds'
+         )
+       ) AS closes_at
+     ) closing`,
+    [firstReceivedAt],
+  );
+  const row = timing.rows[0];
+  if (row === undefined) throw new Error("Settlement window clock missing");
+  const startsAt = new Date(row.closes_at.getTime() - 30 * 60 * 1_000);
+  const priorLeaseExpiresAt = new Date(row.closes_at.getTime() - 2_000);
+  const scheduleVersionId = randomUUID();
+  const scheduleRuleId = randomUUID();
+  const isoWeekday =
+    new Date(`${row.office_local_date}T12:00:00.000Z`).getUTCDay() || 7;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE control_plane.current_presence
+          SET activity_since = $2,
+              eligible_since = $2,
+              lease_expires_at = $3
+        WHERE instance_id = $1`,
+      [topology.instance, startsAt, priorLeaseExpiresAt],
+    );
+    await client.query(
+      `UPDATE control_plane.derived_activity_intervals
+          SET started_at = $2
+        WHERE instance_id = $1
+          AND ended_at IS NULL`,
+      [topology.instance, startsAt],
+    );
+    await client.query(
+      `INSERT INTO control_plane.mount_stats_eligibility_intervals (
+         id, office_id, mount_id, started_at
+       ) VALUES ($1, $2, $3, $4)`,
+      [randomUUID(), topology.office, topology.mount, startsAt],
+    );
+    await client.query(
+      `INSERT INTO control_plane.office_schedule_versions (
+         id, office_id, version, timezone, effective_from_local_date
+       ) VALUES ($1, $2, 1, 'UTC', $3::date)`,
+      [scheduleVersionId, topology.office, row.office_local_date],
+    );
+    await client.query(
+      `INSERT INTO control_plane.office_schedule_rules (
+         id, office_id, schedule_version_id, iso_weekday,
+         start_local_time, end_local_time, end_day_offset
+       ) VALUES (
+         $1, $2, $3, $4,
+         TIME '00:00', TIME '00:01', 0
+       )`,
+      [scheduleRuleId, topology.office, scheduleVersionId, isoWeekday],
+    );
+    await client.query(
+      `INSERT INTO control_plane.office_schedule_occurrences (
+         id, office_id, schedule_version_id, schedule_rule_id,
+         office_local_date, starts_at, ends_at
+       ) VALUES ($1, $2, $3, $4, $5::date, $6, $7)`,
+      [
+        randomUUID(),
+        topology.office,
+        scheduleVersionId,
+        scheduleRuleId,
+        row.office_local_date,
+        startsAt,
+        row.closes_at,
+      ],
+    );
+    await client.query(
+      `INSERT INTO control_plane.office_public_view_tokens (
+         id, office_id, token_hash
+       ) VALUES ($1, $2, $3)`,
+      [randomUUID(), topology.office, Buffer.alloc(32, 7)],
+    );
+    await client.query("COMMIT");
+    return {
+      officeLocalDate: row.office_local_date,
+      closesAt: row.closes_at,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function waitForWaitingQuery(
+  pool: DatabasePool,
+  queryFragment: string,
+  timeoutMilliseconds = 5_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    const waiting = await pool.query<{ waiting: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+           FROM pg_stat_activity
+          WHERE pid <> pg_backend_pid()
+            AND datname = current_database()
+            AND state = 'active'
+            AND wait_event_type = 'Lock'
+            AND query LIKE '%' || $1 || '%'
+       ) AS waiting`,
+      [queryFragment],
+    );
+    if (waiting.rows[0]?.waiting) return;
+    await delay(20);
+  }
+  throw new Error(`Timed out waiting for PostgreSQL query: ${queryFragment}`);
 }
 
 function prepare(

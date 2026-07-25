@@ -39,3 +39,32 @@ test("production defaults to explicit migrations", () => {
     true,
   );
 });
+
+test("public projection cadence and replay retention are bounded", () => {
+  const config = loadConfig({});
+  assert.equal(config.publicProjectionTickSeconds, 30);
+  assert.equal(config.publicReplayMaxRevisions, 256);
+  assert.throws(
+    () =>
+      loadConfig({
+        PUBLIC_PROJECTION_TICK_SECONDS: "1",
+      }),
+    /between 5 and 300/,
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        PUBLIC_REPLAY_MAX_REVISIONS: "100001",
+      }),
+    /between 1 and 100000/,
+  );
+});
+
+test("proxy trust is disabled by default and accepts only a small hop count", () => {
+  assert.equal(loadConfig({}).trustProxyHops, 0);
+  assert.equal(loadConfig({ TRUST_PROXY_HOPS: "1" }).trustProxyHops, 1);
+  assert.throws(
+    () => loadConfig({ TRUST_PROXY_HOPS: "5" }),
+    /between 0 and 4/,
+  );
+});

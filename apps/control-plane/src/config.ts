@@ -5,6 +5,7 @@ export interface ControlPlaneConfig {
   nodeEnv: "development" | "test" | "production";
   host: string;
   port: number;
+  trustProxyHops: number;
   databaseUrl: string;
   databaseSsl: boolean;
   databaseSslCa: string | undefined;
@@ -12,6 +13,9 @@ export interface ControlPlaneConfig {
   allowUnverifiedFakeEdge: boolean;
   presenceLeaseTtlSeconds: number;
   leaseSweepIntervalSeconds: number;
+  publicReplayMaxRevisions: number;
+  publicRetentionIntervalSeconds: number;
+  publicProjectionTickSeconds: number;
   maxRequestBytes: number;
   migrationsDir: string;
   contractsDir: string;
@@ -36,6 +40,13 @@ export function loadConfig(
     nodeEnv,
     host: environment.HOST ?? "127.0.0.1",
     port: parseInteger("PORT", environment.PORT, 3000, 1, 65_535),
+    trustProxyHops: parseInteger(
+      "TRUST_PROXY_HOPS",
+      environment.TRUST_PROXY_HOPS,
+      0,
+      0,
+      4,
+    ),
     databaseUrl:
       environment.DATABASE_URL ??
       "postgres://workbuddy:workbuddy@127.0.0.1:5432/workbuddy",
@@ -58,6 +69,27 @@ export function loadConfig(
       environment.LEASE_SWEEP_INTERVAL_SECONDS,
       5,
       1,
+      300,
+    ),
+    publicReplayMaxRevisions: parseInteger(
+      "PUBLIC_REPLAY_MAX_REVISIONS",
+      environment.PUBLIC_REPLAY_MAX_REVISIONS,
+      256,
+      1,
+      100_000,
+    ),
+    publicRetentionIntervalSeconds: parseInteger(
+      "PUBLIC_RETENTION_INTERVAL_SECONDS",
+      environment.PUBLIC_RETENTION_INTERVAL_SECONDS,
+      60,
+      5,
+      3_600,
+    ),
+    publicProjectionTickSeconds: parseInteger(
+      "PUBLIC_PROJECTION_TICK_SECONDS",
+      environment.PUBLIC_PROJECTION_TICK_SECONDS,
+      30,
+      5,
       300,
     ),
     maxRequestBytes: parseInteger(

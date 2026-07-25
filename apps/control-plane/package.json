@@ -18,6 +18,7 @@
     "dev:fake-edge": "node --import tsx src/dev/fake-edge.ts"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "fastify": "5.10.0",
