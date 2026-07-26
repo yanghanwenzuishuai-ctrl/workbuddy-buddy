@@ -20,6 +20,9 @@ Codex Pets ecosystem.
 - **Glanceable status.** A hook on WorkBuddy's lifecycle drives the pet through 7
   states — `idle · thinking · working · review · waiting · done · failed` — so you
   can tell what your agent is doing without watching its window.
+- **Progressive slacking animation.** After 15/25/35/60 minutes of inactivity,
+  the bundled pets move from a fresh fish, to a salted fish, to a fish costume,
+  and finally to one shared salted-fish form. Any activity resets the timer.
 - **A library of 15 hand-drawn buddies, plus your own.** Switch anytime; drop a
   new one in without a rebuild.
 - **The pet is a permission gate.** When WorkBuddy needs approval, the pet pops an
@@ -70,6 +73,28 @@ tauri build --bundles app       # → target/release/bundle/macos/workbuddy-budd
 
 Undo the hook anytime: `cp ~/.workbuddy/settings.json.wb-buddy-bak ~/.workbuddy/settings.json`
 
+## Mount to an office (M2A preview)
+
+The hosted Control Plane now has a clickable `/start` flow for creating your own
+public office and pairing this Mac:
+
+1. Open the Control Plane's `/start` page, choose the office name, buddy, and
+   sharing options, then create a one-time pairing code.
+2. In the native app, choose **menu-bar tray → 挂载到办公室 / Connect office…**
+   and paste the code exactly as shown.
+3. Keep the browser page open while it checks the pairing status. After the app
+   claims the code, the page takes you to your live office.
+
+The app creates an Ed25519 device key during pairing. The private key stays in
+the operating-system keychain; the Control Plane receives the public key and
+uses it to verify signed state updates and heartbeats. To use a self-hosted or
+local Control Plane, launch the app with
+`WB_BUDDY_CONTROL_PLANE_URL=https://your-control-plane.example`.
+
+This first preview creates an office owned by the person pairing the pet. Joining
+someone else's office by invitation and Agent Mail identity verification are
+follow-up milestones.
+
 ## Buddies
 
 ![buddy gallery](docs/img/buddies.png)
@@ -104,8 +129,8 @@ spool is `0600` and size-capped. Enforced by `hooks/test_privacy.py`.
 WorkBuddy  ──hook──▶  wb-buddy-hook.sh ──▶ events.spool (JSONL, structural-only)
 (lifecycle)          (privacy projector)         │
                                           wb-buddy-watch  (robust spool tailer)
-                                          wb-buddy-core   (7 states · priority
-                                            │              arbitration · TTL decay)
+                                          wb-buddy-core   (7 core + 4 derived
+                                            │              inactivity displays)
                                           display state
                                             ├─▶ wb-buddy-bridge → HTTP → browser pet
                                             └─▶ wb-buddy-app    → Tauri event → native pet

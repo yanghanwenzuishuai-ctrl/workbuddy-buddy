@@ -60,6 +60,7 @@ export type EdgeEndpoint = "batch" | "heartbeat";
 export interface PreparedEdgeReport {
   envelope: EdgeReportEnvelope;
   endpoint: EdgeEndpoint;
+  signingPayload: Buffer;
   canonicalPayload: Buffer;
   canonicalPayloadHash: Buffer;
   canonicalEvents: Array<{

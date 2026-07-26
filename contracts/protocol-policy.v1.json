@@ -20,7 +20,9 @@
     "strictly_increasing": true,
     "contiguous_within_batch": true,
     "batch_atomic": true,
+    "official_edge_max_events_per_boot": 256,
     "current_boot_exact_replay": "return_same_ack_without_side_effects",
+    "fenced_boot_receipt_retention": "delete_receipts_and_event_fingerprints",
     "fenced_boot_replay": "stale_boot_precedes_replay_lookup",
     "same_sequence_different_payload": "sequence_conflict",
     "gap": "sequence_gap",
@@ -71,6 +73,7 @@
     "previous_boot_id_required": true,
     "initial_previous_boot_id": null,
     "new_boot_first_event_kind": "state_transition",
+    "live_same_activity_successor_preserves_interval": true,
     "mismatch_problem_code": "stale_boot"
   },
   "time": {

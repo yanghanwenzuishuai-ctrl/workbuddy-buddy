@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
 
+import Ajv2020 from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
+
 import {
   CONTRACTS_DIR,
   assertAllLocalRefsResolve,
@@ -93,7 +96,7 @@ test("Edge responses advertise protocol compatibility and use strict schemas", a
       assert.ok(accepted.headers[header], `${endpoint} 200 is missing ${header}`);
     }
 
-    for (const status of ["400", "401", "409", "413", "422", "426", "429", "503"]) {
+    for (const status of ["400", "401", "409", "413", "422", "426", "503"]) {
       const response = dereferenceInternal(api, responses[status].$ref);
       assert.equal(
         response.content["application/problem+json"].schema.$ref,
@@ -101,6 +104,58 @@ test("Edge responses advertise protocol compatibility and use strict schemas", a
         `${endpoint} ${status} must use Problem v1`,
       );
     }
+
+    const rateLimited = dereferenceInternal(api, responses["429"].$ref);
+    assert.deepEqual(rateLimited["x-problem-codes"], ["rate_limited"]);
+    assert.equal(
+      rateLimited.content["application/problem+json"].schema.allOf[0].$ref,
+      "./schemas/problem.v1.schema.json",
+    );
+    assert.equal(rateLimited.headers["Retry-After"].required, true);
+    assert.deepEqual(rateLimited.headers["Retry-After"].schema, {
+      type: "integer",
+      minimum: 1,
+      maximum: 86400,
+    });
+  }
+});
+
+test("Edge 429 is a strict rate_limited Problem response", async () => {
+  const api = await readJson(OPENAPI_FILE);
+  const baseProblem = await readJson(
+    path.join(CONTRACTS_DIR, "schemas/problem.v1.schema.json"),
+  );
+  const response = dereferenceInternal(
+    api,
+    api.paths["/api/v1/edge/events:batch"].post.responses["429"].$ref,
+  );
+  const inlineConstraint =
+    response.content["application/problem+json"].schema.allOf[1];
+  const ajv = new Ajv2020({
+    allErrors: true,
+    strict: true,
+    validateFormats: true,
+  });
+  addFormats(ajv);
+  const validate = ajv.compile({
+    allOf: [baseProblem, inlineConstraint],
+  });
+  const body = {
+    type: "https://workbuddy-buddy.invalid/problems/rate_limited",
+    title: "Rate limit exceeded",
+    status: 429,
+    code: "rate_limited",
+    detail: "Too many Edge reports.",
+    retry_after_seconds: 30,
+  };
+  assert.equal(validate(body), true, JSON.stringify(validate.errors, null, 2));
+  for (const invalid of [
+    { ...body, status: 503 },
+    { ...body, code: "temporarily_unavailable" },
+    { ...body, title: "Temporarily unavailable" },
+    { ...body, retry_after_seconds: 0 },
+  ]) {
+    assert.equal(validate(invalid), false, JSON.stringify(invalid));
   }
 });
 

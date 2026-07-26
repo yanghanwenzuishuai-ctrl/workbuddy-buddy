@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/watch", "crates/hookd", "crates/bridge", "src-tauri"]
+members = [
+    "crates/core",
+    "crates/watch",
+    "crates/hookd",
+    "crates/bridge",
+    "crates/edge",
+    "src-tauri",
+]

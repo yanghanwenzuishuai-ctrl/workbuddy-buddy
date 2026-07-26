@@ -37,6 +37,10 @@
       "description": "Signed, idempotent reporting by enrolled Agent instances."
     },
     {
+      "name": "Onboarding",
+      "description": "Anonymous first-run Office creation and short-lived capability pairing. Pairing codes and status tokens are bearer capabilities: clients must redact them from logs, never send them as public Office tokens, and honor `private, no-store` responses."
+    },
+    {
       "name": "Public Office",
       "description": "Unauthenticated, read-only views. Live `agents` are filtered by\n`presence_visible`; leaderboard entries and Daily Awards are filtered\nindependently by `stats_opt_in`. Poster consent is not part of this API\nprojection. No email address, human name, device secret, private history, or\nraw WorkBuddy event is exposed.\n"
     }
@@ -88,7 +92,7 @@
             "$ref": "#/components/responses/UnsupportedProtocol"
           },
           "429": {
-            "$ref": "#/components/responses/RateLimited"
+            "$ref": "#/components/responses/EdgeRateLimited"
           },
           "503": {
             "$ref": "#/components/responses/TemporarilyUnavailable"
@@ -142,10 +146,120 @@
             "$ref": "#/components/responses/UnsupportedProtocol"
           },
           "429": {
-            "$ref": "#/components/responses/RateLimited"
+            "$ref": "#/components/responses/EdgeRateLimited"
           },
           "503": {
             "$ref": "#/components/responses/TemporarilyUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/offices": {
+      "post": {
+        "tags": [
+          "Onboarding"
+        ],
+        "summary": "Create a private Office and issue one pairing.",
+        "description": "Atomically creates a private, unlisted Office with one owner, Lobby, logical Agent, mounted pet, weekday schedule, and short-lived Edge pairing. The raw `pairing_code`, `status_token`, and public Office capability are returned only once and are stored by the server only as hashes. This anonymous convenience endpoint is IP-rate-limited.",
+        "operationId": "createOnboardingOfficeV1",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOfficeOnboardingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/OnboardingOfficeCreated"
+          },
+          "400": {
+            "$ref": "#/components/responses/OnboardingBadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/OnboardingRateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/OnboardingInternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/pairings/{status_token}": {
+      "get": {
+        "tags": [
+          "Onboarding"
+        ],
+        "summary": "Read the status of one short-lived pairing.",
+        "description": "Returns only `pending`, `claimed`, or `expired` for the supplied status capability. The 43-character status token is distinct from both the Edge pairing code and the public Office token. Unknown capabilities return `404` without revealing Office existence.",
+        "operationId": "getOnboardingPairingStatusV1",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PairingStatusToken"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OnboardingPairingStatus"
+          },
+          "400": {
+            "$ref": "#/components/responses/OnboardingBadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/OnboardingPairingNotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/OnboardingRateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/OnboardingInternalError"
+          }
+        }
+      }
+    },
+    "/api/v1/edge/enrollment/claim": {
+      "post": {
+        "tags": [
+          "Onboarding",
+          "Edge"
+        ],
+        "summary": "Claim a pairing with an Ed25519 device key.",
+        "description": "Consumes a pending pairing and enrolls one active Agent instance with the supplied raw 32-byte Ed25519 public key. The key is encoded as canonical padded standard Base64. A replay using the same pairing and public key returns the exact same enrollment result; a different key returns `409`. Expired pairings return `410`. The private key never leaves WorkBuddy.",
+        "operationId": "claimEdgeEnrollmentPairingV1",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimPairingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EdgeEnrollmentClaimed"
+          },
+          "400": {
+            "$ref": "#/components/responses/OnboardingBadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/OnboardingPairingNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/OnboardingPairingConflict"
+          },
+          "410": {
+            "$ref": "#/components/responses/OnboardingPairingExpired"
+          },
+          "429": {
+            "$ref": "#/components/responses/OnboardingRateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/OnboardingInternalError"
           }
         }
       }
@@ -322,6 +436,18 @@
           "pattern": "^[A-Za-z0-9_-]+$"
         }
       },
+      "PairingStatusToken": {
+        "name": "status_token",
+        "in": "path",
+        "required": true,
+        "description": "A 256-bit status capability encoded as exactly 43 unpadded Base64url characters. It authorizes only polling this pairing and must not be logged or confused with the Edge pairing code or public Office token.",
+        "schema": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      },
       "LastEventId": {
         "name": "Last-Event-ID",
         "in": "header",
@@ -389,6 +515,20 @@
           "const": "private, no-store"
         }
       },
+      "NoReferrer": {
+        "description": "Prevents a capability-bearing URL from being disclosed as a referrer.",
+        "schema": {
+          "type": "string",
+          "const": "no-referrer"
+        }
+      },
+      "NoSniff": {
+        "description": "Prevents content-type sniffing on capability responses.",
+        "schema": {
+          "type": "string",
+          "const": "nosniff"
+        }
+      },
       "OfficeRevision": {
         "description": "Current decimal Office projection revision.",
         "schema": {
@@ -404,6 +544,242 @@
       }
     },
     "schemas": {
+      "CreateOfficeOnboardingRequest": {
+        "type": "object",
+        "required": [
+          "office_name",
+          "alias",
+          "pet_id",
+          "presence_visible",
+          "stats_opt_in",
+          "poster_opt_in"
+        ],
+        "properties": {
+          "office_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[^\\r\\n]+$"
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "pattern": "^[^@\\r\\n]+$"
+          },
+          "pet_id": {
+            "enum": [
+              "bloop",
+              "buzz-bit",
+              "comet-lop",
+              "gizmo-kernel",
+              "kiki-koala",
+              "momo-mug",
+              "moss-shell",
+              "nimbus-noodle",
+              "nori-nibble",
+              "olli-orbit",
+              "pico-patch",
+              "pogo-ping",
+              "rumi-relay",
+              "sora-shiba",
+              "taro-tinker"
+            ]
+          },
+          "presence_visible": {
+            "type": "boolean"
+          },
+          "stats_opt_in": {
+            "type": "boolean"
+          },
+          "poster_opt_in": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateOfficeOnboardingResponse": {
+        "type": "object",
+        "required": [
+          "pairing_code",
+          "status_token",
+          "expires_at",
+          "office_url"
+        ],
+        "properties": {
+          "pairing_code": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "status_token": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "office_url": {
+            "type": "string",
+            "minLength": 46,
+            "maxLength": 46,
+            "pattern": "^/o/[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PairingStatusResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "pending",
+              "claimed",
+              "expired"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClaimPairingRequest": {
+        "type": "object",
+        "required": [
+          "pairing_code",
+          "public_key",
+          "client_version"
+        ],
+        "properties": {
+          "pairing_code": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "public_key": {
+            "description": "Canonical standard Base64 encoding of exactly 32 raw Ed25519 public-key bytes.",
+            "type": "string",
+            "minLength": 44,
+            "maxLength": 44,
+            "pattern": "^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$",
+            "contentEncoding": "base64"
+          },
+          "client_version": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 64,
+            "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClaimPairingResponse": {
+        "type": "object",
+        "required": [
+          "server_id",
+          "instance_id",
+          "key_id",
+          "logical_agent_id",
+          "heartbeat_interval_seconds",
+          "credential_valid_until"
+        ],
+        "properties": {
+          "server_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "logical_agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "heartbeat_interval_seconds": {
+            "type": "integer",
+            "const": 30
+          },
+          "credential_valid_until": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OnboardingProblem": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "https://workbuddy-buddy.invalid/problems/invalid_request",
+              "https://workbuddy-buddy.invalid/problems/pairing_not_found",
+              "https://workbuddy-buddy.invalid/problems/pairing_expired",
+              "https://workbuddy-buddy.invalid/problems/pairing_conflict",
+              "https://workbuddy-buddy.invalid/problems/rate_limited",
+              "https://workbuddy-buddy.invalid/problems/internal_error"
+            ]
+          },
+          "title": {
+            "enum": [
+              "Invalid request",
+              "Pairing not found",
+              "Pairing expired",
+              "Pairing conflict",
+              "Rate limit exceeded",
+              "Internal server error"
+            ]
+          },
+          "status": {
+            "enum": [
+              400,
+              404,
+              409,
+              410,
+              429,
+              500
+            ]
+          },
+          "code": {
+            "enum": [
+              "invalid_request",
+              "pairing_not_found",
+              "pairing_expired",
+              "pairing_conflict",
+              "rate_limited",
+              "internal_error"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "retry_after_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300
+          }
+        },
+        "additionalProperties": false
+      },
       "RevisionCursor": {
         "type": "integer",
         "minimum": 0,
@@ -412,6 +788,349 @@
       }
     },
     "responses": {
+      "OnboardingOfficeCreated": {
+        "description": "Private Office topology created and one five-minute pairing issued.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          },
+          "Referrer-Policy": {
+            "$ref": "#/components/headers/NoReferrer"
+          },
+          "X-Content-Type-Options": {
+            "$ref": "#/components/headers/NoSniff"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CreateOfficeOnboardingResponse"
+            }
+          }
+        }
+      },
+      "OnboardingPairingStatus": {
+        "description": "Current state of the pairing capability.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          },
+          "Referrer-Policy": {
+            "$ref": "#/components/headers/NoReferrer"
+          },
+          "X-Content-Type-Options": {
+            "$ref": "#/components/headers/NoSniff"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/PairingStatusResponse"
+            }
+          }
+        }
+      },
+      "EdgeEnrollmentClaimed": {
+        "description": "The device credential was enrolled, or this is an idempotent replay using the same pairing and public key.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          },
+          "Referrer-Policy": {
+            "$ref": "#/components/headers/NoReferrer"
+          },
+          "X-Content-Type-Options": {
+            "$ref": "#/components/headers/NoSniff"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ClaimPairingResponse"
+            }
+          }
+        }
+      },
+      "OnboardingBadRequest": {
+        "description": "The request is malformed, contains extra or missing fields, or violates an onboarding input boundary.",
+        "x-problem-codes": [
+          "invalid_request"
+        ],
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/OnboardingProblem"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "https://workbuddy-buddy.invalid/problems/invalid_request"
+                    },
+                    "title": {
+                      "const": "Invalid request"
+                    },
+                    "status": {
+                      "const": 400
+                    },
+                    "code": {
+                      "const": "invalid_request"
+                    }
+                  },
+                  "not": {
+                    "properties": {
+                      "retry_after_seconds": {}
+                    },
+                    "required": [
+                      "retry_after_seconds"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "OnboardingPairingNotFound": {
+        "description": "The status or pairing capability is unknown.",
+        "x-problem-codes": [
+          "pairing_not_found"
+        ],
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/OnboardingProblem"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "https://workbuddy-buddy.invalid/problems/pairing_not_found"
+                    },
+                    "title": {
+                      "const": "Pairing not found"
+                    },
+                    "status": {
+                      "const": 404
+                    },
+                    "code": {
+                      "const": "pairing_not_found"
+                    }
+                  },
+                  "not": {
+                    "properties": {
+                      "retry_after_seconds": {}
+                    },
+                    "required": [
+                      "retry_after_seconds"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "OnboardingPairingConflict": {
+        "description": "The pairing has already been claimed by a different public key.",
+        "x-problem-codes": [
+          "pairing_conflict"
+        ],
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/OnboardingProblem"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "https://workbuddy-buddy.invalid/problems/pairing_conflict"
+                    },
+                    "title": {
+                      "const": "Pairing conflict"
+                    },
+                    "status": {
+                      "const": 409
+                    },
+                    "code": {
+                      "const": "pairing_conflict"
+                    }
+                  },
+                  "not": {
+                    "properties": {
+                      "retry_after_seconds": {}
+                    },
+                    "required": [
+                      "retry_after_seconds"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "OnboardingPairingExpired": {
+        "description": "The pending pairing has passed its server-authored expiration.",
+        "x-problem-codes": [
+          "pairing_expired"
+        ],
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/OnboardingProblem"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "https://workbuddy-buddy.invalid/problems/pairing_expired"
+                    },
+                    "title": {
+                      "const": "Pairing expired"
+                    },
+                    "status": {
+                      "const": 410
+                    },
+                    "code": {
+                      "const": "pairing_expired"
+                    }
+                  },
+                  "not": {
+                    "properties": {
+                      "retry_after_seconds": {}
+                    },
+                    "required": [
+                      "retry_after_seconds"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "OnboardingRateLimited": {
+        "description": "The per-IP onboarding window or pairing attempt budget is exhausted.",
+        "x-problem-codes": [
+          "rate_limited"
+        ],
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/PrivateNoStore"
+          },
+          "Retry-After": {
+            "description": "Whole seconds until this request may be retried.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/OnboardingProblem"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "retry_after_seconds"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "https://workbuddy-buddy.invalid/problems/rate_limited"
+                    },
+                    "title": {
+                      "const": "Rate limit exceeded"
+                    },
+                    "status": {
+                      "const": 429
+                    },
+                    "code": {
+                      "const": "rate_limited"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "OnboardingInternalError": {
+        "description": "The Control Plane could not complete onboarding.",
+        "x-problem-codes": [
+          "internal_error"
+        ],
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/OnboardingProblem"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "https://workbuddy-buddy.invalid/problems/internal_error"
+                    },
+                    "title": {
+                      "const": "Internal server error"
+                    },
+                    "status": {
+                      "const": 500
+                    },
+                    "code": {
+                      "const": "internal_error"
+                    }
+                  },
+                  "not": {
+                    "properties": {
+                      "retry_after_seconds": {}
+                    },
+                    "required": [
+                      "retry_after_seconds"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
       "EdgeReportAccepted": {
         "description": "The report was durably accepted, or was an exact replay from the still-current boot whose original acknowledgement is returned without side effects. A replay from a fenced boot, sequence gaps, partial overlaps, and same-sequence different-content conflicts use a `409` Problem response. Presence is anchored to the authoritative `server_received_at` in the acknowledgement; `idle_stage` remains server-derived.",
         "headers": {
@@ -585,6 +1304,65 @@
           "application/problem+json": {
             "schema": {
               "$ref": "./schemas/problem.v1.schema.json"
+            }
+          }
+        }
+      },
+      "EdgeRateLimited": {
+        "description": "The signed Edge report was not processed because this enrolled device or source exceeded its reporting budget. No event, lease, receipt, sequence, or scoring state is advanced.",
+        "x-problem-codes": [
+          "rate_limited"
+        ],
+        "headers": {
+          "Retry-After": {
+            "description": "Whole seconds until this Edge should retry the unchanged report.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            }
+          },
+          "X-Min-Supported-Protocol": {
+            "$ref": "#/components/headers/MinSupportedProtocol"
+          },
+          "X-Supported-Protocols": {
+            "$ref": "#/components/headers/SupportedProtocols"
+          },
+          "X-Protocol-Version": {
+            "$ref": "#/components/headers/CurrentProtocol"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "./schemas/problem.v1.schema.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "https://workbuddy-buddy.invalid/problems/rate_limited"
+                    },
+                    "title": {
+                      "const": "Rate limit exceeded"
+                    },
+                    "status": {
+                      "const": 429
+                    },
+                    "code": {
+                      "const": "rate_limited"
+                    },
+                    "retry_after_seconds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 86400
+                    }
+                  }
+                }
+              ]
             }
           }
         }

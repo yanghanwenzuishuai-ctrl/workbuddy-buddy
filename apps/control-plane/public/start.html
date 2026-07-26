@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="referrer" content="no-referrer">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#07131b">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'"
+    >
+    <link rel="icon" href="data:,">
+    <title>挂载 WorkBuddy 宠物</title>
+    <link rel="stylesheet" href="/start.css">
+    <script src="/start.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <div class="start-shell">
+      <header class="start-header">
+        <a class="brand" href="/start" aria-label="WorkBuddy Buddy 挂载首页">
+          <span class="brand-mark" aria-hidden="true">🐟</span>
+          <span>
+            <b>WorkBuddy Buddy</b>
+            <small>咸鱼办公室</small>
+          </span>
+        </a>
+        <span class="preview-badge">M2A · 设备配对预览</span>
+      </header>
+
+      <main class="start-layout">
+        <section class="intro" aria-labelledby="page-title">
+          <p class="eyebrow">BRING YOUR BUDDY</p>
+          <h1 id="page-title">把你的桌宠，<br>挂到同一间办公室。</h1>
+          <p class="intro-copy">
+            选择形象、给它起名，然后用一次性配对码连接 WorkBuddy。
+            挂载后，办公室会自动展示宠物的在线状态和摸鱼形态。
+          </p>
+
+          <ol class="progress-list" aria-label="挂载流程">
+            <li class="is-active" data-progress-step="1">
+              <span>1</span>
+              <div><b>创建工位</b><small>选择宠物与授权范围</small></div>
+            </li>
+            <li data-progress-step="2">
+              <span>2</span>
+              <div><b>输入配对码</b><small>在 WorkBuddy 内确认</small></div>
+            </li>
+            <li data-progress-step="3">
+              <span>3</span>
+              <div><b>进入办公室</b><small>自动跳转到共享画面</small></div>
+            </li>
+          </ol>
+
+          <aside class="mail-note">
+            <span aria-hidden="true">✉️</span>
+            <p>
+              <b>身份能力正在升级</b>
+              设备配对预览，Agent Mail 验证稍后接入。
+            </p>
+          </aside>
+        </section>
+
+        <section class="setup-card" aria-live="polite">
+          <form id="onboarding-form" novalidate>
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">STEP 01</p>
+                <h2>创建你的宠物工位</h2>
+              </div>
+              <span>约 1 分钟</span>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>办公室名称</span>
+                <input
+                  id="office-name"
+                  name="office_name"
+                  type="text"
+                  minlength="1"
+                  maxlength="80"
+                  autocomplete="organization"
+                  placeholder="例如：今天也要准时下班"
+                  required
+                >
+              </label>
+              <label class="field">
+                <span>宠物昵称</span>
+                <input
+                  id="pet-alias"
+                  name="alias"
+                  type="text"
+                  minlength="1"
+                  maxlength="32"
+                  autocomplete="nickname"
+                  placeholder="例如：摸鱼课代表"
+                  required
+                >
+              </label>
+            </div>
+
+            <fieldset class="pet-fieldset">
+              <legend>选择宠物形象 <small>15 选 1</small></legend>
+              <div class="pet-grid">
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="sora-shiba" checked>
+                  <span class="pet-card">
+                    <img src="/pets/sora-shiba/preview.png" alt="" width="120" height="120">
+                    <b>柴犬</b><small>Sora</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="pico-patch">
+                  <span class="pet-card">
+                    <img src="/pets/pico-patch/preview.png" alt="" width="120" height="120">
+                    <b>狐狸</b><small>Pico</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="bloop">
+                  <span class="pet-card">
+                    <img src="/pets/bloop/preview.png" alt="" width="120" height="120">
+                    <b>美西螈</b><small>Bloop</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="olli-orbit">
+                  <span class="pet-card">
+                    <img src="/pets/olli-orbit/preview.png" alt="" width="120" height="120">
+                    <b>猫头鹰</b><small>Olli</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="taro-tinker">
+                  <span class="pet-card">
+                    <img src="/pets/taro-tinker/preview.png" alt="" width="120" height="120">
+                    <b>穿山甲</b><small>Taro</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="nimbus-noodle">
+                  <span class="pet-card">
+                    <img src="/pets/nimbus-noodle/preview.png" alt="" width="120" height="120">
+                    <b>云龙</b><small>Nimbus</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="pogo-ping">
+                  <span class="pet-card">
+                    <img src="/pets/pogo-ping/preview.png" alt="" width="120" height="120">
+                    <b>企鹅</b><small>Pogo</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="buzz-bit">
+                  <span class="pet-card">
+                    <img src="/pets/buzz-bit/preview.png" alt="" width="120" height="120">
+                    <b>蜜蜂</b><small>Buzz</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="comet-lop">
+                  <span class="pet-card">
+                    <img src="/pets/comet-lop/preview.png" alt="" width="120" height="120">
+                    <b>月兔</b><small>Comet</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="gizmo-kernel">
+                  <span class="pet-card">
+                    <img src="/pets/gizmo-kernel/preview.png" alt="" width="120" height="120">
+                    <b>仓鼠</b><small>Gizmo</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="kiki-koala">
+                  <span class="pet-card">
+                    <img src="/pets/kiki-koala/preview.png" alt="" width="120" height="120">
+                    <b>考拉</b><small>Kiki</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="momo-mug">
+                  <span class="pet-card">
+                    <img src="/pets/momo-mug/preview.png" alt="" width="120" height="120">
+                    <b>水豚</b><small>Momo</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="moss-shell">
+                  <span class="pet-card">
+                    <img src="/pets/moss-shell/preview.png" alt="" width="120" height="120">
+                    <b>小龟</b><small>Moss</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="nori-nibble">
+                  <span class="pet-card">
+                    <img src="/pets/nori-nibble/preview.png" alt="" width="120" height="120">
+                    <b>浣熊</b><small>Nori</small>
+                  </span>
+                </label>
+                <label class="pet-option">
+                  <input type="radio" name="pet_id" value="rumi-relay">
+                  <span class="pet-card">
+                    <img src="/pets/rumi-relay/preview.png" alt="" width="120" height="120">
+                    <b>小熊猫</b><small>Rumi</small>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset class="consent-fieldset">
+              <legend>确认数据授权</legend>
+              <p>三项授权互相独立，不勾选的能力保持关闭。</p>
+              <label class="consent-option">
+                <input id="presence-visible" name="presence_visible" type="checkbox" required>
+                <span class="check-mark" aria-hidden="true"></span>
+                <span>
+                  <b>在办公室显示在线状态 <em>挂载必需</em></b>
+                  <small>允许显示在线、离线和当前工作状态，不包含任务正文。</small>
+                </span>
+              </label>
+              <label class="consent-option">
+                <input id="stats-opt-in" name="stats_opt_in" type="checkbox">
+                <span class="check-mark" aria-hidden="true"></span>
+                <span>
+                  <b>参加今日摸鱼统计 <em>可选</em></b>
+                  <small>允许按天累计闲置时长，并参与“咸鱼王”趣味评选。</small>
+                </span>
+              </label>
+              <label class="consent-option">
+                <input id="poster-opt-in" name="poster_opt_in" type="checkbox">
+                <span class="check-mark" aria-hidden="true"></span>
+                <span>
+                  <b>出现在分享海报中 <em>可选</em></b>
+                  <small>允许昵称和宠物形象用于当天的办公室榜单海报。</small>
+                </span>
+              </label>
+            </fieldset>
+
+            <p id="form-error" class="form-error" role="alert" hidden></p>
+            <button id="create-button" class="primary-button" type="submit">
+              创建工位并生成配对码
+              <span aria-hidden="true">→</span>
+            </button>
+            <p class="privacy-line">🔒 配对码短时有效、仅可使用一次；不会上传任务正文。</p>
+          </form>
+
+          <section id="pairing-panel" class="pairing-panel" hidden>
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">STEP 02</p>
+                <h2>去 WorkBuddy 输入配对码</h2>
+              </div>
+              <span id="expiry-label">有效期 --:--</span>
+            </div>
+
+            <div class="code-block">
+              <span>你的一次性配对码</span>
+              <strong id="pairing-code">------</strong>
+              <button id="copy-code" class="copy-button" type="button">复制配对码</button>
+            </div>
+
+            <ol class="device-steps">
+              <li><span>1</span><p>打开 WorkBuddy 桌宠的<b>“挂载到办公室”</b>入口。</p></li>
+              <li><span>2</span><p>输入上面的配对码，并在本机确认授权。</p></li>
+              <li><span>3</span><p>保持本页打开；连接成功后会自动进入办公室。</p></li>
+            </ol>
+
+            <div id="pairing-state" class="pairing-state is-pending" role="status">
+              <span class="state-spinner" aria-hidden="true"></span>
+              <div>
+                <b id="pairing-state-title">正在等待 WorkBuddy…</b>
+                <small id="pairing-state-detail">本页会自动检测配对结果</small>
+              </div>
+            </div>
+
+            <a id="office-link" class="office-link" href="/start" hidden>配对成功，立即进入办公室 →</a>
+            <button id="restart-button" class="secondary-button" type="button">重新创建配对</button>
+          </section>
+        </section>
+      </main>
+
+      <footer class="start-footer">
+        <span>趣味状态 · 非考勤依据</span>
+        <span>workbuddy-buddy</span>
+      </footer>
+    </div>
+  </body>
+</html>

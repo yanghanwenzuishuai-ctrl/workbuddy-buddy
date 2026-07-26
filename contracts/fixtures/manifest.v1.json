@@ -157,6 +157,15 @@
   ],
   "protocol_scenarios": [
     {
+      "fixture": "edge-report-signature.v1.golden.json",
+      "schema": "../schemas/edge-report-envelope.v1.schema.json",
+      "envelope_json_pointers": [
+        "/envelope"
+      ],
+      "expect_each_schema_valid": true,
+      "scenario": "ed25519_signature_golden_vector"
+    },
+    {
       "fixture": "edge-report-envelope.semantic.replay-conflict-pair.json",
       "schema": "../schemas/edge-report-envelope.v1.schema.json",
       "envelope_json_pointers": [

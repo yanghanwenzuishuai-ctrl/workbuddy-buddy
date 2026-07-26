@@ -10,6 +10,7 @@ import {
   canonicalBytes,
   sha256,
 } from "../../modules/presence/domain/canonical-json.js";
+import { createEdgeReportSigningPayload } from "../../modules/presence/domain/edge-signature.js";
 import { ProtocolProblem } from "../../modules/presence/domain/problem.js";
 import {
   MAX_SAFE_SEQUENCE,
@@ -69,6 +70,7 @@ export async function createEdgeReportValidator(
       return {
         envelope,
         endpoint,
+        signingPayload: createEdgeReportSigningPayload(envelope),
         canonicalPayload,
         canonicalPayloadHash: sha256(canonicalPayload),
         canonicalEvents: envelope.events.map((event) => {

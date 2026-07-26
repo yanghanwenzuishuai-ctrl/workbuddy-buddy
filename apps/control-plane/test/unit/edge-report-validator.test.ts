@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { loadConfig } from "../../src/config.js";
+import { EDGE_REPORT_SIGNATURE_DOMAIN_V1 } from "../../src/modules/presence/domain/edge-signature.js";
 import { ProtocolProblem } from "../../src/modules/presence/domain/problem.js";
 import { createEdgeReportValidator } from "../../src/platform/contracts/edge-report-validator.js";
 
@@ -34,6 +35,26 @@ test("validator prepares a schema-valid privacy-safe report", () => {
   assert.equal(prepared.envelope.first_sequence, 1);
   assert.equal(prepared.canonicalEvents.length, 1);
   assert.equal(prepared.canonicalPayloadHash.length, 32);
+  assert.equal(
+    prepared.signingPayload
+      .subarray(0, Buffer.byteLength(EDGE_REPORT_SIGNATURE_DOMAIN_V1))
+      .toString("utf8"),
+    EDGE_REPORT_SIGNATURE_DOMAIN_V1,
+  );
+});
+
+test("signing bytes omit signature while stored canonical bytes retain it", () => {
+  const left = validator.prepare(structuredClone(baseReport), "batch");
+  const right = validator.prepare(
+    {
+      ...structuredClone(baseReport),
+      signature: `${"B".repeat(86)}==`,
+    },
+    "batch",
+  );
+
+  assert.deepEqual(left.signingPayload, right.signingPayload);
+  assert.notDeepEqual(left.canonicalPayload, right.canonicalPayload);
 });
 
 test("validator rejects client-authoritative or private fields", () => {

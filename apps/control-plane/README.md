@@ -1,8 +1,9 @@
 # WorkBuddy Buddy Control Plane
 
-Milestone 1 is an isolated TypeScript modular monolith backed by PostgreSQL.
-It implements the protocol's transactional boot/sequence ingestion core while
-keeping real device enrollment and signature verification in Milestone 2.
+The Control Plane is an isolated TypeScript modular monolith backed by
+PostgreSQL. Milestone 2A adds a clickable onboarding flow and real device
+enrollment/signature verification to the transactional boot/sequence ingestion
+core delivered in Milestone 1.
 
 ## Local start
 
@@ -14,14 +15,40 @@ The default container exposes:
 
 - `GET /livez`: process liveness only.
 - `GET /readyz`: PostgreSQL connectivity and migration readiness.
+- `POST /api/v1/onboarding/offices`: create an owned office and one-time pairing.
+- `GET /api/v1/onboarding/pairings/:status_token`: poll that pairing's status.
+- `POST /api/v1/edge/enrollment/claim`: bind a device public key to the pairing.
 - `POST /api/v1/edge/events:batch`
 - `POST /api/v1/edge/heartbeat`
 - `GET /api/v1/offices/:public_view_token/snapshot`
 - `GET /api/v1/offices/:public_view_token/events`
+- `GET /start`: clickable create-and-pair page
 - `GET /o/:public_view_token`: responsive Public Office page
 
-Edge writes are disabled unless a verifier is installed. For local fake-edge
-work only, run the service outside production with
+## Pair a WorkBuddy pet
+
+Open `/start`, choose the office name, buddy, and sharing options, then create
+the office. The page displays a one-time pairing code and polls
+`GET /api/v1/onboarding/pairings/:status_token`. In the native desktop app,
+choose **menu-bar tray → 挂载到办公室 / Connect office…** and paste the code.
+The page automatically opens the Public Office after the device claims it.
+
+During the claim, the desktop app generates an Ed25519 device key. Only the
+public key is sent to the Control Plane; the private key is kept in the
+operating-system keychain and signs subsequent state updates and heartbeats.
+The server resolves the active device credential and verifies each signature.
+Set `WB_BUDDY_CONTROL_PLANE_URL` when launching the desktop app to override its
+default hosted Control Plane, for example:
+
+```bash
+WB_BUDDY_CONTROL_PLANE_URL=http://127.0.0.1:3000 cargo run -p wb-buddy-app
+```
+
+Pairing currently creates a new office owned by that user. Joining an existing
+office by invitation and Agent Mail identity verification are later milestones;
+Agent Mail is not treated as an unattended bearer token.
+
+For local fake-edge work only, run the service outside production with
 `ALLOW_UNVERIFIED_FAKE_EDGE=true`, seed the dev topology, and submit a fixture:
 
 ```bash
@@ -40,10 +67,16 @@ The development verifier still requires a non-revoked database credential
 bound to the active reporting instance. It only bypasses Ed25519 verification;
 the bypass refuses to start when `NODE_ENV=production`.
 
-Production startup does not run DDL by default. Run `db:migrate` as an
-explicit release step with a migration-capable database role, then start the
-service with a runtime role. `MIGRATE_ON_START=true` is intended for local
-development and single-user self-hosting only.
+Production startup does not run DDL by default. Run the compiled migration
+entrypoint as an explicit release step with a migration-capable database role,
+then start the service with a runtime role:
+
+```bash
+node apps/control-plane/dist/platform/db/migrate-cli.js
+```
+
+Use the same command as Railway's pre-deploy step. `MIGRATE_ON_START=true` is
+intended for local development and single-user self-hosting only.
 
 ## Public Office guarantees
 
@@ -77,9 +110,9 @@ Important runtime settings:
 - `PUBLIC_RETENTION_INTERVAL_SECONDS` (default `60`)
 - `TRUST_PROXY_HOPS` (default `0`; set only for a verified ingress topology)
 
-The account/member management API, Agent Mail identity challenge, real Edge
-enrollment/signatures, and poster/short-video export pipeline remain separate
-follow-up milestones. Agent Mail is not used as an unattended bearer token.
+The account/member management API, invitations to an existing office, Agent
+Mail identity challenge, and poster/short-video export pipeline remain separate
+follow-up milestones.
 
 ## Verification
 
@@ -100,8 +133,10 @@ JSON contract. It does not accept raw WorkBuddy spools, prompts, messages,
 commands, paths, session IDs, tool content, or email content.
 
 Protocol v1 retains receipt comparison bytes only while a boot is current.
-When a successor boot is accepted, its predecessor's canonical payload bytes
-and per-event replay fingerprints are scrubbed; the boot tombstone remains for
-fencing. Before public beta, the protocol still needs an explicit maximum boot
-lifetime or rollover policy so a never-ending current boot cannot grow its
-heartbeat receipt ledger without bound.
+The official Edge rotates after at most 256 accepted events and starts its
+successor with a complete signed state snapshot. When that successor is
+accepted, the predecessor's receipts and event fingerprints are deleted; only
+the boot tombstone remains for fencing. A live same-activity rollover preserves
+the continuous scoring boundary; a lease gap or changed activity breaks it.
+Heartbeats that merely renew a live lease do not create redundant Public Office
+revisions.

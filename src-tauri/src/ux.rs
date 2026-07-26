@@ -143,7 +143,11 @@ fn cursor_outside_sprite(win: &WebviewWindow, ct: &ClickThrough) -> bool {
         Some(r) => r,
         None => return false, // no silhouette yet → stay interactive
     };
-    match (win.cursor_position(), win.outer_position(), win.scale_factor()) {
+    match (
+        win.cursor_position(),
+        win.outer_position(),
+        win.scale_factor(),
+    ) {
         (Ok(cur), Ok(wp), Ok(sf)) => {
             let rx = (cur.x - wp.x as f64) / sf;
             let ry = (cur.y - wp.y as f64) / sf;
@@ -162,7 +166,11 @@ fn apply_ignore(win: &WebviewWindow, ct: &ClickThrough, ignore: bool) {
 // ---- position persistence (~/.workbuddy-buddy/window.json) ----
 fn store_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
-    Some(PathBuf::from(home).join(".workbuddy-buddy").join("window.json"))
+    Some(
+        PathBuf::from(home)
+            .join(".workbuddy-buddy")
+            .join("window.json"),
+    )
 }
 fn load_pos() -> Option<(i32, i32)> {
     let s = std::fs::read_to_string(store_path()?).ok()?;

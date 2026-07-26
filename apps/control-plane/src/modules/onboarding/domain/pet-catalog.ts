@@ -1,0 +1,17 @@
+export const ONBOARDING_PET_IDS = new Set([
+  "bloop",
+  "buzz-bit",
+  "comet-lop",
+  "gizmo-kernel",
+  "kiki-koala",
+  "momo-mug",
+  "moss-shell",
+  "nimbus-noodle",
+  "nori-nibble",
+  "olli-orbit",
+  "pico-patch",
+  "pogo-ping",
+  "rumi-relay",
+  "sora-shiba",
+  "taro-tinker",
+]);

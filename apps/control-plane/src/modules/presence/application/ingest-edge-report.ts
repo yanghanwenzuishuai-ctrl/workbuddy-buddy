@@ -10,6 +10,7 @@ import {
   createPublicOfficeProjector,
   type PublicOfficeProjector,
 } from "../../public-office/application/public-office-projector.js";
+import { ONBOARDING_PET_IDS } from "../../onboarding/domain/pet-catalog.js";
 import { ProtocolProblem } from "../domain/problem.js";
 import {
   MAX_SAFE_SEQUENCE,
@@ -121,6 +122,7 @@ export function createEdgeReportIngestor(
       verified: VerifiedEdgeContext,
     ): Promise<EdgeReportAck> {
       assertVerifiedIdentity(report, verified);
+      assertSupportedPetIds(report);
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -314,14 +316,21 @@ async function ingestInTransaction(
     serverReceivedAt.getTime() + leaseTtlSeconds * 1_000,
   );
   let presence = await lockPresence(client, instance.id);
+  let seamlessBootRollover = false;
 
   if (isNewBoot) {
+    seamlessBootRollover = canRollBootWithoutBreakingActivity(
+      presence,
+      envelope.events[0],
+      serverReceivedAt,
+    );
     await fencePreviousBootAndPresence(
       client,
       instance.id,
       head.current_boot_id,
       presence,
       serverReceivedAt,
+      seamlessBootRollover,
     );
     await createBootAndAdvanceHead(
       client,
@@ -338,7 +347,15 @@ async function ingestInTransaction(
       generation: String(bootGeneration),
       next_sequence: "1",
     };
-    presence = null;
+    if (seamlessBootRollover) {
+      await moveOpenActivityIntervalToBoot(
+        client,
+        instance.id,
+        bootGeneration,
+      );
+    } else {
+      presence = null;
+    }
   }
 
   if (boot === null) {
@@ -388,7 +405,7 @@ async function ingestInTransaction(
     bootGeneration,
     report.envelope.events,
     presence,
-    isNewBoot || leaseWasExpired,
+    (isNewBoot && !seamlessBootRollover) || leaseWasExpired,
     serverReceivedAt,
   );
   await savePresence(
@@ -400,6 +417,18 @@ async function ingestInTransaction(
     serverReceivedAt,
     leaseExpiresAt,
   );
+  if (
+    report.envelope.events.some(
+      (event) => event.kind === "state_transition",
+    )
+  ) {
+    await client.query(
+      `UPDATE control_plane.logical_agents
+          SET pet_id = $2
+        WHERE id = $1`,
+      [agent.id, updatedPresence.petId],
+    );
+  }
 
   await client.query(
     `UPDATE control_plane.agent_instance_boots
@@ -416,13 +445,19 @@ async function ingestInTransaction(
     [instance.id, serverReceivedAt],
   );
 
-  await appendOfficeRevisionEvents(
-    client,
-    publicOfficeProjector,
-    receiptId,
-    lockedOfficeIds,
-    serverReceivedAt,
-  );
+  if (
+    isNewBoot ||
+    leaseWasExpired ||
+    report.envelope.events.some((event) => event.kind === "state_transition")
+  ) {
+    await appendOfficeRevisionEvents(
+      client,
+      publicOfficeProjector,
+      receiptId,
+      lockedOfficeIds,
+      serverReceivedAt,
+    );
+  }
 
   return {
     current_protocol: 1,
@@ -450,6 +485,35 @@ function assertVerifiedIdentity(
       "The verified device identity does not match the report envelope.",
     );
   }
+}
+
+function assertSupportedPetIds(report: PreparedEdgeReport): void {
+  for (const event of report.envelope.events) {
+    if (
+      event.kind === "state_transition" &&
+      !ONBOARDING_PET_IDS.has(event.pet_id)
+    ) {
+      throw new ProtocolProblem(
+        "report_semantics_invalid",
+        422,
+        "The selected pet is not supported by this Control Plane.",
+      );
+    }
+  }
+}
+
+function canRollBootWithoutBreakingActivity(
+  presence: PresenceRow | null,
+  firstEvent: EdgeEvent | undefined,
+  serverReceivedAt: Date,
+): boolean {
+  return (
+    presence !== null &&
+    presence.lease_closed_at === null &&
+    presence.lease_expires_at.getTime() > serverReceivedAt.getTime() &&
+    firstEvent?.kind === "state_transition" &&
+    firstEvent.activity_state === presence.activity_state
+  );
 }
 
 async function lockInstance(
@@ -682,6 +746,7 @@ async function fencePreviousBootAndPresence(
   previousBootId: string | null,
   presence: PresenceRow | null,
   serverReceivedAt: Date,
+  preserveLivePresence: boolean,
 ): Promise<void> {
   if (previousBootId !== null) {
     await client.query(
@@ -694,6 +759,7 @@ async function fencePreviousBootAndPresence(
     );
     await scrubFencedBootReplayMaterial(client, instanceId, previousBootId);
   }
+  if (preserveLivePresence) return;
   if (presence !== null) {
     const leaseExpired =
       presence.lease_expires_at.getTime() <= serverReceivedAt.getTime();
@@ -717,25 +783,33 @@ async function fencePreviousBootAndPresence(
   }
 }
 
+async function moveOpenActivityIntervalToBoot(
+  client: DatabaseClient,
+  instanceId: string,
+  bootGeneration: number,
+): Promise<void> {
+  const result = await client.query(
+    `UPDATE control_plane.derived_activity_intervals
+        SET boot_generation = $2,
+            start_sequence = 1
+      WHERE instance_id = $1
+        AND ended_at IS NULL`,
+    [instanceId, bootGeneration],
+  );
+  if (result.rowCount !== 1) {
+    throw new Error(
+      "Seamless boot rollover requires one open activity interval",
+    );
+  }
+}
+
 async function scrubFencedBootReplayMaterial(
   client: DatabaseClient,
   instanceId: string,
   bootId: string,
 ): Promise<void> {
   await client.query(
-    `DELETE FROM control_plane.edge_event_fingerprints
-      WHERE instance_id = $1
-        AND boot_generation = (
-          SELECT generation
-            FROM control_plane.agent_instance_boots
-           WHERE instance_id = $1
-             AND boot_id = $2
-        )`,
-    [instanceId, bootId],
-  );
-  await client.query(
-    `UPDATE control_plane.edge_report_receipts
-        SET canonical_payload = ''::bytea
+    `DELETE FROM control_plane.edge_report_receipts
       WHERE instance_id = $1
         AND boot_id = $2`,
     [instanceId, bootId],

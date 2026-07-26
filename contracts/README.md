@@ -10,6 +10,8 @@ Edge and a future Control Plane.
   envelope. The heartbeat endpoint uses `#/$defs/heartbeatEnvelope`.
 - `schemas/edge-report-ack.v1.schema.json` — server-authored acknowledgement and
   lease boundary.
+- `edge-report-signing.v1.md` — exact Ed25519 domain separator, canonical
+  signing bytes, encodings, and golden vector.
 - `schemas/problem.v1.schema.json` — stable problem codes.
 - `schemas/public-office-snapshot.v1.schema.json` — consent-filtered public
   snapshot/SSE projection.
@@ -29,6 +31,11 @@ Edge and a future Control Plane.
 - A complete canonical replay is idempotent only while its boot remains current.
   A fenced boot always returns `stale_boot`. Reusing a sequence with different
   content is a conflict; gaps and partial overlaps reject the batch atomically.
+- The official Edge rotates after at most 256 accepted events. Once its
+  successor is accepted, the fenced boot's receipts and event fingerprints are
+  deleted while its fencing tombstone remains. A successor received before
+  lease expiry with the same activity classification preserves the continuous
+  scoring interval; an expired lease or changed activity breaks it.
 - Every envelope carries `previous_boot_id`. The first boot uses null; a new
   boot must compare-and-swap against the server's current boot, and sequence 1
   must be a complete state snapshot. This fences both known and previously
@@ -60,8 +67,7 @@ The dependencies are test-only and pinned in `package-lock.json`.
 
 ## Deliberately deferred
 
-These contracts define the wire shape and acceptance semantics; they do not
-implement a Control Plane. Canonical JSON signing bytes, Ed25519 test vectors,
-device enrollment, key rotation/revocation, database idempotency constraints,
-and the real SSE replay store belong to Milestones 1–2 and must be completed
-before claiming replay-resistant authenticated reporting.
+These contracts define the wire shape and acceptance semantics. M2A implements
+one-time device enrollment and an active Ed25519 verifier. Account recovery,
+credential replacement/revocation UI, and invitation-based membership remain
+separate lifecycle milestones.

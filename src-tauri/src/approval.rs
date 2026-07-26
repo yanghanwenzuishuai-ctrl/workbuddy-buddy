@@ -50,7 +50,9 @@ pub fn port() -> u16 {
 
 fn cors(resp: Response<std::io::Cursor<Vec<u8>>>) -> Response<std::io::Cursor<Vec<u8>>> {
     resp.with_header(Header::from_bytes("Access-Control-Allow-Origin", "*").unwrap())
-        .with_header(Header::from_bytes("Access-Control-Allow-Methods", "POST, GET, OPTIONS").unwrap())
+        .with_header(
+            Header::from_bytes("Access-Control-Allow-Methods", "POST, GET, OPTIONS").unwrap(),
+        )
         .with_header(Header::from_bytes("Access-Control-Allow-Headers", "content-type").unwrap())
 }
 
@@ -93,7 +95,11 @@ pub fn start(app: AppHandle) {
                 };
 
                 if method == Method::Get && path == "/userpets" {
-                    respond(req, 200, &serde_json::to_string(&scan_user_pets()).unwrap_or_else(|_| "[]".into()));
+                    respond(
+                        req,
+                        200,
+                        &serde_json::to_string(&scan_user_pets()).unwrap_or_else(|_| "[]".into()),
+                    );
                     return;
                 }
                 if method == Method::Get && path.starts_with("/userpets/") {
@@ -122,7 +128,9 @@ pub fn start(app: AppHandle) {
                                 "seconds": DECISION_WINDOW.as_secs(),
                             }),
                         );
-                        let decision = rx.recv_timeout(DECISION_WINDOW).unwrap_or_else(|_| "timeout".into());
+                        let decision = rx
+                            .recv_timeout(DECISION_WINDOW)
+                            .unwrap_or_else(|_| "timeout".into());
                         if let Ok(mut m) = pending().lock() {
                             m.remove(&id); // in case of timeout
                         }
@@ -142,8 +150,15 @@ pub fn start(app: AppHandle) {
                         }
                     }
                     (Method::Get, "/pending") => {
-                        let ids: Vec<u64> = pending().lock().map(|m| m.keys().cloned().collect()).unwrap_or_default();
-                        respond(req, 200, &serde_json::to_string(&ids).unwrap_or_else(|_| "[]".into()));
+                        let ids: Vec<u64> = pending()
+                            .lock()
+                            .map(|m| m.keys().cloned().collect())
+                            .unwrap_or_default();
+                        respond(
+                            req,
+                            200,
+                            &serde_json::to_string(&ids).unwrap_or_else(|_| "[]".into()),
+                        );
                     }
                     _ => respond(req, 404, "not found"),
                 }
@@ -157,28 +172,46 @@ pub fn start(app: AppHandle) {
 fn serve_userpet(path: &str, req: tiny_http::Request) {
     let rel = &path["/userpet/".len()..];
     if rel.is_empty() || rel.split('/').any(|c| c == "..") {
-        let _ = req.respond(cors(Response::from_string("bad path").with_status_code(400)));
+        let _ = req.respond(cors(
+            Response::from_string("bad path").with_status_code(400),
+        ));
         return;
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let file = std::path::Path::new(&home).join(".workbuddy-buddy").join("pet").join(rel);
+    let file = std::path::Path::new(&home)
+        .join(".workbuddy-buddy")
+        .join("pet")
+        .join(rel);
     match std::fs::read(&file) {
         Ok(bytes) => {
-            let ct = if rel.ends_with(".json") { "application/json; charset=utf-8" }
-                     else if rel.ends_with(".png") { "image/png" }
-                     else if rel.ends_with(".webp") { "image/webp" }
-                     else { "application/octet-stream" };
-            let resp = cors(Response::from_data(bytes)
-                .with_header(Header::from_bytes("Content-Type", ct).unwrap()));
+            let ct = if rel.ends_with(".json") {
+                "application/json; charset=utf-8"
+            } else if rel.ends_with(".png") {
+                "image/png"
+            } else if rel.ends_with(".webp") {
+                "image/webp"
+            } else {
+                "application/octet-stream"
+            };
+            let resp = cors(
+                Response::from_data(bytes)
+                    .with_header(Header::from_bytes("Content-Type", ct).unwrap()),
+            );
             let _ = req.respond(resp);
         }
-        Err(_) => { let _ = req.respond(cors(Response::from_string("not found").with_status_code(404))); }
+        Err(_) => {
+            let _ = req.respond(cors(
+                Response::from_string("not found").with_status_code(404),
+            ));
+        }
     }
 }
 
 fn user_pets_root() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    std::path::Path::new(&home).join(".workbuddy-buddy").join("pets")
+    std::path::Path::new(&home)
+        .join(".workbuddy-buddy")
+        .join("pets")
 }
 
 /// Scan `~/.workbuddy-buddy/pets/<id>/` for drop-in packs and return manifest
@@ -186,23 +219,32 @@ fn user_pets_root() -> std::path::PathBuf {
 /// picker opens, so a newly dropped-in buddy appears without an app restart.
 fn scan_user_pets() -> Vec<serde_json::Value> {
     let mut out = Vec::new();
-    let Ok(rd) = std::fs::read_dir(user_pets_root()) else { return out };
+    let Ok(rd) = std::fs::read_dir(user_pets_root()) else {
+        return out;
+    };
     let mut dirs: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.path()).collect();
     dirs.sort();
     for dir in dirs {
-        if !dir.is_dir() || !dir.join("pet.json").exists() || !dir.join("spritesheet.png").exists() {
+        if !dir.is_dir() || !dir.join("pet.json").exists() || !dir.join("spritesheet.png").exists()
+        {
             continue;
         }
-        let Some(id) = dir.file_name().and_then(|s| s.to_str()).map(str::to_string) else { continue };
+        let Some(id) = dir.file_name().and_then(|s| s.to_str()).map(str::to_string) else {
+            continue;
+        };
         if id.is_empty() || id.starts_with('.') {
             continue;
         }
         let (mut name, mut desc) = (id.clone(), String::new());
-        if let Ok(v) = std::fs::read_to_string(dir.join("pet.json"))
-            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).map_err(std::io::Error::other))
-        {
-            if let Some(n) = v.get("displayName").and_then(|x| x.as_str()) { name = n.to_string(); }
-            if let Some(d) = v.get("description").and_then(|x| x.as_str()) { desc = d.to_string(); }
+        if let Ok(v) = std::fs::read_to_string(dir.join("pet.json")).and_then(|t| {
+            serde_json::from_str::<serde_json::Value>(&t).map_err(std::io::Error::other)
+        }) {
+            if let Some(n) = v.get("displayName").and_then(|x| x.as_str()) {
+                name = n.to_string();
+            }
+            if let Some(d) = v.get("description").and_then(|x| x.as_str()) {
+                desc = d.to_string();
+            }
         }
         out.push(serde_json::json!({
             "id": id, "displayName": name, "description": desc,
@@ -220,18 +262,30 @@ fn serve_userpets(path: &str, req: tiny_http::Request) {
     let fname = parts.last().copied().unwrap_or("");
     let ok_ext = fname.ends_with(".json") || fname.ends_with(".png") || fname.ends_with(".webp");
     if bad || !ok_ext {
-        let _ = req.respond(cors(Response::from_string("bad path").with_status_code(400)));
+        let _ = req.respond(cors(
+            Response::from_string("bad path").with_status_code(400),
+        ));
         return;
     }
     match std::fs::read(user_pets_root().join(rel)) {
         Ok(bytes) => {
-            let ct = if fname.ends_with(".json") { "application/json; charset=utf-8" }
-                     else if fname.ends_with(".webp") { "image/webp" }
-                     else { "image/png" };
-            let _ = req.respond(cors(Response::from_data(bytes)
-                .with_header(Header::from_bytes("Content-Type", ct).unwrap())));
+            let ct = if fname.ends_with(".json") {
+                "application/json; charset=utf-8"
+            } else if fname.ends_with(".webp") {
+                "image/webp"
+            } else {
+                "image/png"
+            };
+            let _ = req.respond(cors(
+                Response::from_data(bytes)
+                    .with_header(Header::from_bytes("Content-Type", ct).unwrap()),
+            ));
         }
-        Err(_) => { let _ = req.respond(cors(Response::from_string("not found").with_status_code(404))); }
+        Err(_) => {
+            let _ = req.respond(cors(
+                Response::from_string("not found").with_status_code(404),
+            ));
+        }
     }
 }
 

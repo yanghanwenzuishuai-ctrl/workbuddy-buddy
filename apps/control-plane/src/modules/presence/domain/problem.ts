@@ -10,6 +10,7 @@ export type ProblemCode =
   | "sequence_conflict"
   | "report_semantics_invalid"
   | "payload_too_large"
+  | "rate_limited"
   | "temporarily_unavailable"
   | "internal_error";
 
@@ -22,24 +23,28 @@ export interface ProblemBody {
   expected_sequence?: number;
   current_protocol?: number;
   min_supported_protocol?: number;
+  retry_after_seconds?: number;
 }
 
 export class ProtocolProblem extends Error {
   readonly code: ProblemCode;
   readonly status: number;
   readonly expectedSequence: number | undefined;
+  readonly retryAfterSeconds: number | undefined;
 
   constructor(
     code: ProblemCode,
     status: number,
     detail: string,
     expectedSequence?: number,
+    retryAfterSeconds?: number,
   ) {
     super(detail);
     this.name = "ProtocolProblem";
     this.code = code;
     this.status = status;
     this.expectedSequence = expectedSequence;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 
   toBody(): ProblemBody {
@@ -56,6 +61,9 @@ export class ProtocolProblem extends Error {
     if (this.code === "protocol_version_unsupported") {
       body.current_protocol = 1;
       body.min_supported_protocol = 1;
+    }
+    if (this.retryAfterSeconds !== undefined) {
+      body.retry_after_seconds = this.retryAfterSeconds;
     }
     return body;
   }
@@ -85,6 +93,8 @@ function titleFor(code: ProblemCode): string {
       return "Report semantics are invalid";
     case "payload_too_large":
       return "Payload too large";
+    case "rate_limited":
+      return "Rate limit exceeded";
     case "temporarily_unavailable":
       return "Temporarily unavailable";
     case "internal_error":

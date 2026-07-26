@@ -5,8 +5,8 @@ import { createPublicOfficeProjector } from "./modules/public-office/application
 import { retainOfficeRevisions } from "./modules/public-office/application/retain-office-revisions.js";
 import { tickPublicOffices } from "./modules/public-office/application/tick-public-offices.js";
 import {
+  createEd25519EdgeVerifier,
   DevelopmentBypassEdgeVerifier,
-  DisabledEdgeVerifier,
 } from "./modules/presence/application/edge-verifier.js";
 import { expireDueLeases } from "./modules/presence/application/expire-leases.js";
 import { createEdgeReportValidator } from "./platform/contracts/edge-report-validator.js";
@@ -33,7 +33,7 @@ try {
   await officeRevisionBroker.start();
   const verifier = config.allowUnverifiedFakeEdge
     ? new DevelopmentBypassEdgeVerifier()
-    : new DisabledEdgeVerifier();
+    : createEd25519EdgeVerifier(pool);
   const app = buildApp({
     config,
     pool,

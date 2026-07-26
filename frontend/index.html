@@ -76,6 +76,30 @@
   #picker .pempty { grid-column: 1 / -1; text-align: center; color: #9aa1b8; font-size: 12px; padding: 24px; }
   #picker .pfoot { font-size: 10px; color: #9aa1b8; padding: 4px 14px 10px; text-align: center; line-height: 1.6; }
   #picker .pfoot code { background: #eef0f6; border-radius: 4px; padding: 0 4px; }
+
+  /* ---- Control Plane pairing ---- */
+  #connect { display: none; position: absolute; inset: 0; z-index: 35; box-sizing: border-box;
+    flex-direction: column; gap: 12px; padding: 14px;
+    background: rgba(248,249,252,.98); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
+  #connect.show { display: flex; }
+  #connect .chead { display: flex; align-items: center; gap: 8px; }
+  #connect .chead b { flex: 1; color: #2b3350; font-size: 15px; }
+  #connect .cclose { border: none; width: 28px; height: 28px; border-radius: 50%;
+    background: #e9ecf4; color: #667085; cursor: pointer; }
+  #connect .cintro { margin: 0; color: #687087; font-size: 11px; line-height: 1.55; }
+  #connect label { color: #333d55; font-size: 11px; font-weight: 700; }
+  #connect .ccode { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 11px 10px;
+    border: 1px solid #cfd5e4; border-radius: 10px; outline: none; background: #fff;
+    color: #25304a; font: 700 13px/1 ui-monospace, Menlo, monospace; letter-spacing: .03em; }
+  #connect .ccode:focus { border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,.12); }
+  #connect .csubmit { border: 0; border-radius: 10px; padding: 10px;
+    background: #4a6cf7; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+  #connect .csubmit:disabled { cursor: wait; opacity: .55; }
+  #connect .cstatus { min-height: 34px; margin: 0; padding: 8px 9px; border-radius: 9px;
+    background: #eef1f7; color: #687087; font-size: 11px; line-height: 1.45; }
+  #connect .cstatus.ok { background: #e7f7ec; color: #28713a; }
+  #connect .cstatus.err { background: #fff0ef; color: #9a3934; }
+  #connect .cprivacy { margin-top: auto; color: #959cad; font-size: 9px; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -90,11 +114,29 @@
     <div class="pgrid"></div>
     <div class="pfoot">把 pet 包放进 <code>~/.workbuddy-buddy/pets/</code> 即可添加自己的伙伴（打开此面板自动刷新）</div>
   </div>
+  <div id="connect" role="dialog" aria-modal="true" aria-labelledby="connect-title">
+    <div class="chead">
+      <b id="connect-title">挂载到咸鱼办公室</b>
+      <button class="cclose" type="button" title="关闭">✕</button>
+    </div>
+    <p class="cintro">先在办公室网页点击“挂载 WorkBuddy”生成一次性配对码，再粘贴到这里。</p>
+    <label>
+      一次性配对码
+      <input class="ccode" inputmode="text" autocomplete="one-time-code"
+        autocapitalize="none" spellcheck="false" maxlength="96" placeholder="粘贴网页生成的 43 位配对码">
+    </label>
+    <button class="csubmit" type="button">确认挂载</button>
+    <p class="cstatus" role="status" aria-live="polite">设备私钥只保存在系统钥匙串中。</p>
+    <p class="cprivacy">仅上传派生状态与官方宠物 ID；不会上传 prompt、回复、工具参数、路径、会话或邮件内容。Agent Mail 邮箱验证将在后续版本单独接入。</p>
+  </div>
   <div id="stage"><canvas id="pet" width="192" height="208"></canvas></div>
   <div class="label" id="lbl">idle</div>
   <div class="controls dev" id="ctrls"></div>
 <script>
-const STATES = ["idle", "thinking", "working", "review", "waiting", "done", "failed"];
+const STATES = [
+  "idle", "thinking", "working", "review", "waiting", "done", "failed",
+  "slacking", "slacking_salted", "slacking_costume", "slacking_shared_fish",
+];
 const APPROVAL = "http://127.0.0.1:8792";   // Tauri approval/pet server (absent in bridge/browser)
 const canvas = document.getElementById("pet");
 const ctx = canvas.getContext("2d");
@@ -145,6 +187,9 @@ async function loadPetDesc(p) {
     frameIdx = 0; acc = 0;
     activeKey = petKey(p);
     try { localStorage.setItem("wb-buddy-pet", activeKey); } catch (_) {}
+    if (window.__TAURI__ && window.__TAURI__.event) {
+      window.__TAURI__.event.emit("pet-selection-changed", { source: p.source, id: p.id });
+    }
     markPickerSelection();
     if (!ready) {
       ready = true;
@@ -223,12 +268,15 @@ function draw(a) {
 }
 
 function setState(s) {
-  if (!STATES.includes(s)) return;
-  if (!ready) { pendingState = s; return; }
-  cur = s; frameIdx = 0; acc = 0;
+  if (!STATES.includes(s)) return false;
+  if (!ready) { pendingState = s; return false; }
+  const changed = cur !== s;
+  cur = s;
+  if (changed) { frameIdx = 0; acc = 0; }
   document.getElementById("lbl").textContent = s;
   [...document.querySelectorAll("#ctrls button")].forEach(b =>
     b.classList.toggle("active", b.dataset.s === s));
+  return changed;
 }
 
 function buildControls() {
@@ -249,7 +297,7 @@ function buildControls() {
 let demoTimer = null;
 function runDemo() {
   if (demoTimer) { clearInterval(demoTimer); demoTimer = null; return; }
-  const seq = ["idle", "thinking", "working", "review", "waiting", "done", "failed", "idle"];
+  const seq = [...STATES, "idle"];
   let i = 0; setState(seq[0]);
   demoTimer = setInterval(() => { i = (i + 1) % seq.length; setState(seq[i]); }, 1200);
 }
@@ -295,6 +343,70 @@ function closePicker() { $picker.classList.remove("show"); reportHit(); }
 $picker.querySelector(".pclose").addEventListener("click", closePicker);
 $picker.addEventListener("click", e => { if (e.target === $picker) closePicker(); });
 
+// ---- Control Plane pairing ----
+const $connect = document.getElementById("connect");
+const $connectCode = $connect.querySelector(".ccode");
+const $connectSubmit = $connect.querySelector(".csubmit");
+const $connectStatus = $connect.querySelector(".cstatus");
+function setConnectStatus(message, kind = "") {
+  $connectStatus.textContent = message;
+  $connectStatus.className = "cstatus" + (kind ? " " + kind : "");
+}
+async function openConnect() {
+  closePicker();
+  $connect.classList.add("show");
+  setConnectStatus("正在检查当前挂载状态…");
+  reportHit();
+  setTimeout(() => $connectCode.focus(), 0);
+  const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  if (!invoke) {
+    setConnectStatus("请从 WorkBuddy Buddy 桌面应用打开此面板。", "err");
+    return;
+  }
+  try {
+    const status = await invoke("edge_connection_status");
+    if (status && status.connected) {
+      setConnectStatus("这只桌宠已挂载。重新输入配对码会切换到新的办公室。", "ok");
+    } else if (status && status.credential_expired) {
+      setConnectStatus("设备凭证已过期，请在网页上重新生成配对码。", "err");
+    } else if (status && status.configured && !status.credential_available) {
+      setConnectStatus("挂载配置存在，但系统钥匙串暂不可用；应用会自动重试。", "err");
+    } else {
+      setConnectStatus("设备私钥只会写入系统钥匙串。");
+    }
+  } catch (_) {
+    setConnectStatus("暂时无法读取挂载状态，请稍后重试。", "err");
+  }
+}
+function closeConnect() {
+  $connect.classList.remove("show");
+  reportHit();
+}
+async function submitPairing() {
+  const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  const pairingCode = $connectCode.value.trim();
+  if (!invoke || !pairingCode) {
+    setConnectStatus("请粘贴网页生成的完整配对码。", "err");
+    return;
+  }
+  $connectSubmit.disabled = true;
+  setConnectStatus("正在生成设备密钥并完成挂载…");
+  try {
+    await invoke("pair_office", { pairingCode });
+    $connectCode.value = "";
+    setConnectStatus("挂载成功！真实状态会在几秒内出现在办公室。", "ok");
+  } catch (error) {
+    setConnectStatus(typeof error === "string" ? error : "挂载失败，请重新生成配对码。", "err");
+  } finally {
+    $connectSubmit.disabled = false;
+  }
+}
+$connect.querySelector(".cclose").addEventListener("click", closeConnect);
+$connectSubmit.addEventListener("click", submitPairing);
+$connectCode.addEventListener("keydown", event => {
+  if (event.key === "Enter") submitPairing();
+});
+
 // ---- approval bubble ----
 const approvalQ = [];
 let approvalCur = null, approvalTimer = null;
@@ -336,7 +448,8 @@ $a.querySelector(".deny").addEventListener("click", () => decideApproval("deny")
 // Rust side can let clicks fall through the transparent margins around the sprite.
 function isFullInteractive() {
   return document.getElementById("picker").classList.contains("show")
-      || document.getElementById("approval").classList.contains("show");
+      || document.getElementById("approval").classList.contains("show")
+      || document.getElementById("connect").classList.contains("show");
 }
 function opaqueBBox() {
   try {
@@ -376,7 +489,9 @@ function reportHit() {
 // ---- state source contract ----
 window.wbBuddy = {
   setState, getState: () => cur, isReady: () => ready,
-  openPicker, getPet: () => activeKey, refreshLibrary,
+  openPicker, openConnect, getPet: () => activeKey, refreshLibrary,
+  _getAnimationState: () => pet && pet.animations[cur] ? cur : "idle",
+  _getFrameIndex: () => frameIdx,
   _testApproval: p => { approvalQ.push(p || { id: 0, tool_name: "Bash", detail: "ls -la", seconds: 50 }); renderApproval(); },
 };
 
@@ -385,6 +500,7 @@ if (new URLSearchParams(location.search).has("embed")) document.body.classList.a
 if (window.__TAURI__ && window.__TAURI__.event) {
   window.__TAURI__.event.listen("pet-state", e => setState((e.payload || "").toString().trim()));
   window.__TAURI__.event.listen("open-picker", () => openPicker());
+  window.__TAURI__.event.listen("open-connect", () => openConnect());
   window.__TAURI__.event.listen("pet-approval", e => { approvalQ.push(e.payload || {}); renderApproval(); });
   window.__TAURI__.event.listen("pet-approval-done", e => {
     const id = (e.payload || {}).id;

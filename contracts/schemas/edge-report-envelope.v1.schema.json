@@ -3,7 +3,7 @@
   "$id": "https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/contracts/schemas/edge-report-envelope.v1.schema.json",
   "title": "WorkBuddy Buddy Edge Report Envelope v1",
   "description": "A signed, privacy-safe batch of derived state transitions and heartbeats from one enrolled Agent Instance boot.",
-  "$comment": "Protocol rules that JSON Schema cannot express: a new boot starts at sequence 1, previous_boot_id is null for an Instance's first boot and must otherwise compare-and-swap against the server's current boot, and the first event of a new boot must be a complete state_transition snapshot. first_sequence equals events[0].sequence; event sequences are strictly consecutive and share one namespace across state_transition and heartbeat; the batch is atomic; an exact full-payload replay returns the same acknowledgement without side effects; a reused sequence with a different payload is sequence_conflict; a gap is sequence_gap; a partial overlap is sequence_overlap; and once a new boot is accepted, both known and previously unseen delayed old boots are fenced and cannot affect presence, lease, grace, or scoring. The server assigns server_received_at and uses it as the authoritative accounting boundary. The client must never submit received_at/server_received_at or idle_stage. Signature verification and canonical signing bytes are protocol-level checks rather than schema checks.",
+  "$comment": "Protocol rules that JSON Schema cannot express: a new boot starts at sequence 1, previous_boot_id is null for an Instance's first boot and must otherwise compare-and-swap against the server's current boot, and the first event of a new boot must be a complete state_transition snapshot. first_sequence equals events[0].sequence; event sequences are strictly consecutive and share one namespace across state_transition and heartbeat; the batch is atomic; an exact full-payload replay returns the same acknowledgement without side effects; a reused sequence with a different payload is sequence_conflict; a gap is sequence_gap; a partial overlap is sequence_overlap; and once a new boot is accepted, both known and previously unseen delayed old boots are fenced and cannot affect presence, lease, grace, or scoring. The server assigns server_received_at and uses it as the authoritative accounting boundary. The client must never submit received_at/server_received_at or idle_stage. Signature verification and canonical signing bytes are protocol-level checks defined by edge-report-signing.v1.md rather than schema checks.",
   "type": "object",
   "required": [
     "protocol_version",
@@ -94,13 +94,26 @@
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
     },
     "petId": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 64,
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "enum": [
+        "bloop",
+        "buzz-bit",
+        "comet-lop",
+        "gizmo-kernel",
+        "kiki-koala",
+        "momo-mug",
+        "moss-shell",
+        "nimbus-noodle",
+        "nori-nibble",
+        "olli-orbit",
+        "pico-patch",
+        "pogo-ping",
+        "rumi-relay",
+        "sora-shiba",
+        "taro-tinker"
+      ]
     },
     "ed25519Signature": {
-      "description": "Standard Base64 encoding of a 64-byte Ed25519 signature.",
+      "description": "Canonical padded standard Base64 encoding of a 64-byte Ed25519 signature over the signing payload defined by edge-report-signing.v1.md.",
       "type": "string",
       "minLength": 88,
       "maxLength": 88,

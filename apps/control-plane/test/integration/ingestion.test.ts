@@ -269,6 +269,159 @@ if (testDatabaseUrl === undefined) {
       );
     });
 
+    test("an accepted WorkBuddy pet selection becomes the projected pet", async () => {
+      const boot = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      await accept(
+        ingestor,
+        topology,
+        prepare(
+          validator,
+          topology,
+          boot,
+          null,
+          [state(1, "idle", "eligible_idle", "bloop")],
+        ),
+      );
+      const stored = await pool.query<{ pet_id: string }>(
+        `SELECT pet_id
+           FROM control_plane.logical_agents
+          WHERE id = $1`,
+        [topology.agent],
+      );
+      const projection = await pool.query<{
+        snapshot_payload: {
+          agents: Array<{ pet_id: string }>;
+        };
+      }>(
+        `SELECT snapshot_payload
+           FROM control_plane.office_current_public_projections
+          WHERE office_id = $1`,
+        [topology.office],
+      );
+      assert.equal(stored.rows[0]?.pet_id, "bloop");
+      assert.equal(
+        projection.rows[0]?.snapshot_payload.agents[0]?.pet_id,
+        "bloop",
+      );
+    });
+
+    test("heartbeat renewals do not rebuild public projections and fenced receipts are deleted", async () => {
+      const bootA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const bootB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+      await accept(
+        ingestor,
+        topology,
+        prepare(validator, topology, bootA, null, [state(1)]),
+      );
+      await accept(
+        ingestor,
+        topology,
+        prepare(validator, topology, bootA, null, [heartbeat(2)]),
+      );
+      const afterHeartbeat = await counts(pool);
+      assert.equal(afterHeartbeat.receipts, 2);
+      assert.equal(afterHeartbeat.events, 2);
+      assert.equal(afterHeartbeat.revisions, 1);
+      assert.equal(afterHeartbeat.outbox, 1);
+
+      const anchor = await pool.query<{ started_at: Date }>(
+        `UPDATE control_plane.derived_activity_intervals
+            SET started_at = clock_timestamp() - interval '1 hour'
+          WHERE instance_id = $1
+            AND ended_at IS NULL
+        RETURNING started_at`,
+        [topology.instance],
+      );
+      const eligibleSince = anchor.rows[0]?.started_at;
+      assert.ok(eligibleSince);
+      await pool.query(
+        `UPDATE control_plane.current_presence
+            SET activity_since = $2,
+                eligible_since = $2
+          WHERE instance_id = $1`,
+        [topology.instance, eligibleSince],
+      );
+      await accept(
+        ingestor,
+        topology,
+        prepare(validator, topology, bootB, bootA, [state(1)]),
+      );
+      const afterRotation = await counts(pool);
+      assert.equal(afterRotation.boots, 2);
+      assert.equal(afterRotation.receipts, 1);
+      assert.equal(afterRotation.events, 1);
+      assert.equal(afterRotation.revisions, 2);
+      assert.equal(afterRotation.outbox, 2);
+      assert.equal(afterRotation.intervals, 1);
+      const continuity = await pool.query<{
+        boot_generation: string;
+        started_at: Date;
+        eligible_since: Date;
+      }>(
+        `SELECT
+           interval.boot_generation,
+           interval.started_at,
+           presence.eligible_since
+         FROM control_plane.derived_activity_intervals interval
+         JOIN control_plane.current_presence presence
+           ON presence.instance_id = interval.instance_id
+        WHERE interval.instance_id = $1
+          AND interval.ended_at IS NULL`,
+        [topology.instance],
+      );
+      assert.equal(continuity.rows[0]?.boot_generation, "2");
+      assert.equal(
+        continuity.rows[0]?.started_at.toISOString(),
+        eligibleSince.toISOString(),
+      );
+      assert.equal(
+        continuity.rows[0]?.eligible_since.toISOString(),
+        eligibleSince.toISOString(),
+      );
+
+      await accept(
+        ingestor,
+        topology,
+        prepare(validator, topology, bootB, bootA, [
+          state(2, "working", "active"),
+        ]),
+      );
+      const afterActivity = await pool.query<{
+        boot_generation: string;
+        activity_state: string;
+        start_sequence: string;
+        end_sequence: string | null;
+        close_reason: string | null;
+      }>(
+        `SELECT
+           boot_generation::text,
+           activity_state,
+           start_sequence::text,
+           end_sequence::text,
+           close_reason
+         FROM control_plane.derived_activity_intervals
+        WHERE instance_id = $1
+        ORDER BY started_at, start_sequence`,
+        [topology.instance],
+      );
+      assert.deepEqual(afterActivity.rows, [
+        {
+          boot_generation: "2",
+          activity_state: "eligible_idle",
+          start_sequence: "1",
+          end_sequence: "2",
+          close_reason: "state_changed",
+        },
+        {
+          boot_generation: "2",
+          activity_state: "active",
+          start_sequence: "2",
+          end_sequence: null,
+          close_reason: null,
+        },
+      ]);
+    });
+
     test("a pre-close heartbeat blocked in-flight is committed before Daily Award settlement", async () => {
       const boot = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
       const firstAck = await accept(
@@ -559,6 +712,7 @@ if (testDatabaseUrl === undefined) {
       );
       const scrubbed = await pool.query<{
         event_count: string;
+        receipt_count: string;
         retained_payload_bytes: string;
       }>(
         `SELECT
@@ -569,6 +723,12 @@ if (testDatabaseUrl === undefined) {
                 AND boot_generation = 1
            ) AS event_count,
            (
+             SELECT count(*)
+               FROM control_plane.edge_report_receipts
+              WHERE instance_id = $1
+                AND boot_generation = 1
+           ) AS receipt_count,
+           (
              SELECT COALESCE(sum(octet_length(canonical_payload)), 0)
                FROM control_plane.edge_report_receipts
               WHERE instance_id = $1
@@ -578,6 +738,7 @@ if (testDatabaseUrl === undefined) {
       );
       assert.deepEqual(scrubbed.rows[0], {
         event_count: "0",
+        receipt_count: "0",
         retained_payload_bytes: "0",
       });
       const before = await counts(pool);
@@ -684,7 +845,13 @@ if (testDatabaseUrl === undefined) {
       await accept(
         ingestor,
         topology,
-        prepare(validator, topology, bootB, bootA, [state(1)]),
+        prepare(
+          validator,
+          topology,
+          bootB,
+          bootA,
+          [state(1, "working", "active")],
+        ),
       );
       const recovered = await pool.query<{
         start_sequence: string;
@@ -1144,6 +1311,7 @@ function state(
   sequence: number,
   displayState: "idle" | "working" = "idle",
   activityState: "eligible_idle" | "active" = "eligible_idle",
+  petId = "sora-shiba",
 ): EdgeEvent {
   return {
     sequence,
@@ -1151,7 +1319,7 @@ function state(
     observed_at: "2026-07-24T12:00:00Z",
     display_state: displayState,
     activity_state: activityState,
-    pet_id: "sora-shiba",
+    pet_id: petId,
   };
 }
 

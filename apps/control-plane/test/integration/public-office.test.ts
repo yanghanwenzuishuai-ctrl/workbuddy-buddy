@@ -913,6 +913,12 @@ async function seedPublicTopology(
       [ids.office, ids.account],
     );
     await client.query(
+      `INSERT INTO control_plane.memberships (
+         id, office_id, account_id, created_at
+       ) VALUES ($1, $2, $3, $4)`,
+      [randomUUID(), ids.office, ids.account, PROJECTION_AT],
+    );
+    await client.query(
       `INSERT INTO control_plane.rooms (
          id, office_id, name, scene_capacity, created_at
        ) VALUES ($1, $2, 'Lobby', 24, $3)`,
