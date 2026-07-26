@@ -24,6 +24,10 @@ fn state_code(s: State) -> u8 {
         State::Waiting => 2,
         State::Done => 3,
         State::Failed => 4,
+        State::SlackingFresh => 5,
+        State::SlackingSalted => 6,
+        State::SlackingCostume => 7,
+        State::SlackingFish => 8,
     }
 }
 
@@ -33,6 +37,10 @@ fn state_str(code: u8) -> &'static str {
         2 => "waiting",
         3 => "done",
         4 => "failed",
+        5 => "slacking",
+        6 => "slacking_salted",
+        7 => "slacking_costume",
+        8 => "slacking_shared_fish",
         _ => "idle",
     }
 }
@@ -74,7 +82,10 @@ fn main() {
     let addr = std::env::var("WB_BUDDY_ADDR").unwrap_or_else(|_| "127.0.0.1:8787".into());
     let root = frontend_dir();
     let server = Server::http(&addr).expect("bind failed");
-    eprintln!("[wb-buddy-bridge] http://{addr}  frontend={}", root.display());
+    eprintln!(
+        "[wb-buddy-bridge] http://{addr}  frontend={}",
+        root.display()
+    );
 
     for req in server.incoming_requests() {
         let url = req.url().split('?').next().unwrap_or("/").to_string();
@@ -88,7 +99,11 @@ fn main() {
             continue;
         }
 
-        let rel = if url == "/" { "index.html" } else { url.trim_start_matches('/') };
+        let rel = if url == "/" {
+            "index.html"
+        } else {
+            url.trim_start_matches('/')
+        };
         serve_static(&root, rel, req);
     }
 }
@@ -102,11 +117,43 @@ fn serve_static(root: &Path, rel: &str, req: tiny_http::Request) {
     let path = root.join(rel);
     match std::fs::read(&path) {
         Ok(bytes) => {
-            let resp = Response::from_data(bytes).with_header(hdr("Content-Type", content_type(rel)));
+            let resp =
+                Response::from_data(bytes).with_header(hdr("Content-Type", content_type(rel)));
             let _ = req.respond(resp);
         }
         Err(_) => {
             let _ = req.respond(Response::from_string("not found").with_status_code(404));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bridge_maps_every_core_state_to_its_wire_string() {
+        let cases = [
+            (State::Idle, 0, "idle"),
+            (State::Working, 1, "working"),
+            (State::Waiting, 2, "waiting"),
+            (State::Done, 3, "done"),
+            (State::Failed, 4, "failed"),
+            (State::SlackingFresh, 5, "slacking"),
+            (State::SlackingSalted, 6, "slacking_salted"),
+            (State::SlackingCostume, 7, "slacking_costume"),
+            (State::SlackingFish, 8, "slacking_shared_fish"),
+        ];
+
+        for (state, code, wire) in cases {
+            assert_eq!(state_code(state), code);
+            assert_eq!(state_str(code), wire);
+            assert_eq!(wire, state.as_str());
+        }
+    }
+
+    #[test]
+    fn unknown_bridge_code_falls_back_to_idle() {
+        assert_eq!(state_str(u8::MAX), "idle");
     }
 }

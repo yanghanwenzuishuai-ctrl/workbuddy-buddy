@@ -9,7 +9,7 @@
     "width": 192,
     "height": 208,
     "columns": 8,
-    "rows": 7
+    "rows": 11
   },
   "animations": {
     "idle": {
@@ -116,6 +116,102 @@
       ],
       "fps": 4,
       "loop": true
+    },
+    "slacking": {
+      "row": 7,
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "fps": 6,
+      "loop": true
+    },
+    "slacking_salted": {
+      "row": 8,
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "fps": 5,
+      "loop": true
+    },
+    "slacking_costume": {
+      "row": 9,
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "fps": 5,
+      "loop": true
+    },
+    "slacking_shared_fish": {
+      "row": 10,
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "fps": 4,
+      "loop": true
+    }
+  },
+  "extensions": {
+    "workbuddy": {
+      "slacking": {
+        "version": 1,
+        "clock": "workbuddyInactivity",
+        "resetOnActivity": true,
+        "replacesStates": [
+          "idle",
+          "done"
+        ],
+        "sharedFinal": true,
+        "stages": [
+          {
+            "id": "fresh_fish",
+            "minIdleSeconds": 900,
+            "animation": "slacking"
+          },
+          {
+            "id": "salted_fish",
+            "minIdleSeconds": 1500,
+            "animation": "slacking_salted"
+          },
+          {
+            "id": "fish_costume",
+            "minIdleSeconds": 2100,
+            "animation": "slacking_costume"
+          },
+          {
+            "id": "shared_salted_fish",
+            "minIdleSeconds": 3600,
+            "animation": "slacking_shared_fish"
+          }
+        ]
+      }
     }
   }
 }

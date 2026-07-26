@@ -5,7 +5,8 @@ code and docs are very welcome too.
 
 ## Add a buddy
 
-The pet is a swappable **pet pack** (`pet.json` + a 7-state spritesheet). See
+The pet is a swappable **pet pack** (`pet.json` + a 7-core-state spritesheet,
+optionally extended with the four progressive slacking rows). See
 **[docs/PET_SPEC.md](docs/PET_SPEC.md)** for the full authoring spec (grid,
 states, `pet.json` schema, checklist).
 

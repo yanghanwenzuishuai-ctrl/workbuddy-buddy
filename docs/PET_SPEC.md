@@ -12,7 +12,7 @@ is the canonical example — copy it and edit.
 
 ---
 
-## 1. The 7 states
+## 1. The 7 core states
 
 The pet reflects WorkBuddy's live status. Your spritesheet must provide an
 animation row for **each** of these state names (they are the exact keys in
@@ -37,6 +37,26 @@ animation row for **each** of these state names (they are the exact keys in
 You don't have to make all 7 visually distinct, but the more distinct they are,
 the more useful the pet — the whole point is a glanceable status.
 
+### Optional `slacking` extension: one logical state, four stages
+
+`slacking` (摸鱼) is one logical idle-time state. It is represented by four
+internal animation keys so the app can choose a progressively stronger visual
+without cycling through the earlier stages:
+
+| idle for at least | internal animation | visual |
+|---|---|---|
+| 15 min | `slacking` | the pet plays with or pats a fresh fish |
+| 25 min | `slacking_salted` | the same fish has become a salted fish |
+| 35 min | `slacking_costume` | the pet wears the shared salted-fish costume design |
+| 60 min | `slacking_shared_fish` | the pet is replaced by the same canonical salted fish used by every pack |
+
+The app evaluates these thresholds only while the resolved core state is
+`idle` or `done`; any new activity resets the inactivity timer. Active,
+waiting, and failed states still win. `slacking` is therefore a derived display
+state rather than an eighth competing WorkBuddy status.
+The four thresholds and animation mapping are declared under
+`extensions.workbuddy.slacking` so legacy seven-row packs remain valid.
+
 ---
 
 ## 2. Spritesheet layout
@@ -52,13 +72,23 @@ row 3 [ review… ]
 row 4 [ wait …  ]
 row 5 [ done …  ]
 row 6 [ fail …  ]
+row 7 [ fresh-fish f0 ]…[ fresh-fish f7 ]     (optional slacking extension)
+row 8 [ salted-fish f0]…[ salted-fish f7]
+row 9 [ fish-costume f0]…[ fish-costume f7]
+row10 [ shared-final f0]…[ shared-final f7]
 ```
 
 - **Cell size**: any consistent `width × height` (reference uses **192 × 208**).
-- **Columns**: any `N` frames per row (reference uses **8**). More frames = smoother animation.
+- **Columns**: any `N` frames per row (reference uses **8**). Extra frames help
+  only when they add genuine intermediate motion; duplicated or independently
+  redrawn frames can make the loop less stable rather than smoother.
 - **Rows**: one per state. Row order is **defined by `pet.json`, not by position** —
   each animation names its own `row`, so you may order rows however you like as
   long as `pet.json` points to the right one.
+- **Slacking rows**: packs declaring `extensions.workbuddy.slacking` append its four
+  eight-frame animations at rows 7–10. With the reference cell size, the final
+  atlas is `1536 × 2288` (`8 × 192` by `11 × 208`). Keep rows 0–6 byte-for-byte
+  unchanged when extending an existing pack.
 - Background **must be transparent** — the window is transparent and the pet floats.
 - This is the same grid convention as Codex Pets, so most Codex/`pet.json`
   spritesheets are compatible after adjusting the animation keys to the 7 names above.
@@ -91,6 +121,51 @@ Frame at `(row, frameIndex)` is drawn from pixel rect
 }
 ```
 
+To add the optional slacking state, change `frame.rows` to at least `11`, append
+the four animation entries below, and declare the extension. The stage list is
+ordered and normative; import validation requires these exact thresholds,
+animation names, rows, and eight-frame sequences.
+
+```json
+{
+  "frame": { "width": 192, "height": 208, "columns": 8, "rows": 11 },
+  "animations": {
+    "idle":                { "row": 0,  "frames": [0,1,2,3,4,5,6,7], "fps": 6, "loop": true },
+    "thinking":            { "row": 1,  "frames": [0,1,2,3,4,5,6,7], "fps": 10, "loop": true },
+    "working":             { "row": 2,  "frames": [0,1,2,3,4,5,6,7], "fps": 12, "loop": true },
+    "review":              { "row": 3,  "frames": [0,1,2,3,4,5,6,7], "fps": 10, "loop": true },
+    "waiting":             { "row": 4,  "frames": [0,1,2,3,4,5,6,7], "fps": 5, "loop": true },
+    "done":                { "row": 5,  "frames": [0,1,2,3,4,5,6,7], "fps": 8, "loop": true },
+    "failed":              { "row": 6,  "frames": [0,1,2,3,4,5,6,7], "fps": 4, "loop": true },
+    "slacking":            { "row": 7,  "frames": [0,1,2,3,4,5,6,7], "fps": 6, "loop": true },
+    "slacking_salted":     { "row": 8,  "frames": [0,1,2,3,4,5,6,7], "fps": 5, "loop": true },
+    "slacking_costume":    { "row": 9,  "frames": [0,1,2,3,4,5,6,7], "fps": 5, "loop": true },
+    "slacking_shared_fish":{ "row": 10, "frames": [0,1,2,3,4,5,6,7], "fps": 4, "loop": true }
+  },
+  "extensions": {
+    "workbuddy": {
+      "slacking": {
+        "version": 1,
+        "clock": "workbuddyInactivity",
+        "resetOnActivity": true,
+        "replacesStates": ["idle", "done"],
+        "sharedFinal": true,
+        "stages": [
+          { "id": "fresh_fish", "minIdleSeconds": 900, "animation": "slacking" },
+          { "id": "salted_fish", "minIdleSeconds": 1500, "animation": "slacking_salted" },
+          { "id": "fish_costume", "minIdleSeconds": 2100, "animation": "slacking_costume" },
+          { "id": "shared_salted_fish", "minIdleSeconds": 3600, "animation": "slacking_shared_fish" }
+        ]
+      }
+    }
+  }
+}
+```
+
+`slacking_shared_fish` is authored once as a canonical `1536 × 208` row and copied
+pixel-for-pixel into row 10 of every extended pack. Packs remain self-contained;
+`sharedFinal` does not introduce a third runtime file.
+
 | field | required | meaning |
 |-------|----------|---------|
 | `id` | ✓ | short unique slug |
@@ -99,7 +174,7 @@ Frame at `(row, frameIndex)` is drawn from pixel rect
 | `spritesheetPath` | ✓ | path to the PNG, relative to `pet.json` |
 | `frame.width` / `frame.height` | ✓ | cell size in px |
 | `frame.columns` | ✓ | frames per row (used to compute the source x) |
-| `frame.rows` | – | informational |
+| `frame.rows` | – | physical atlas row count; optional for legacy packs, required when an extension adds rows |
 | `animations` | ✓ | one entry per state (all 7); each: |
 | &nbsp;&nbsp;`row` | ✓ | which grid row (0-based) |
 | &nbsp;&nbsp;`frames` | ✓ | frame indices to play, e.g. `[0,1,2,3]` |
@@ -107,8 +182,10 @@ Frame at `(row, frameIndex)` is drawn from pixel rect
 | &nbsp;&nbsp;`loop` | – | `true` loops; `false` holds the last frame |
 
 Minimum to render: valid `frame` dims + a `spritesheetPath` + at least an
-`idle` animation. Missing states fall back to `idle`, so you can start with one
-row and grow — but a real pet should define all 7.
+`idle` animation. Missing core states fall back to `idle`, so you can start with
+one row and grow — but a real pet should define all 7. The importer continues
+to accept seven-state packs with no `extensions.workbuddy.slacking`. Once that extension
+is declared, all four staged animations and their additional rows are required.
 
 ---
 
@@ -160,6 +237,15 @@ and its output is exactly the drop-in format for A.
 - **One glanceable difference per state** — color is the fastest signal; add an
   expression/prop (`?` for waiting, sparkle for done, X-eyes for failed).
 - **2–8 frames** of gentle motion (bob, blink) reads as "alive" without being noisy.
+  For the slacking extension, use eight genuinely consecutive, loop-closing
+  frames per stage. Duplicating frames or independently redrawing the whole pet
+  does not improve smoothness; keep one body scale and anchor, then animate
+  local parts such as eyes, paws, fish tail, or costume fins.
+- **Animated GIF is not supported.** The renderer selects a crop from the
+  manifest-driven PNG/WebP atlas and gives every state its own frame sequence
+  and fps. A GIF provides one fixed timeline, has weaker indexed-color/alpha
+  behavior, and cannot expose independently selectable state rows. Converting
+  to GIF would not correct scale, anchor, or bounding-box drift.
 - Keep `waiting` and `failed` the most eye-catching — those are the ones you must notice.
 - **Privacy**: pets are pure art; they receive only the current state string,
   never any of your conversation or command data.
@@ -169,6 +255,13 @@ and its output is exactly the drop-in format for A.
 - [ ] `pet.json` parses; `frame.width/height/columns` present
 - [ ] all 7 animation keys exist (`idle thinking working review waiting done failed`)
 - [ ] each `row` is within the sheet; each `frames` index `< columns`
+- [ ] sheet height covers `frame.rows × frame.height` (legacy manifests without
+      `frame.rows` are inferred from their animation rows, with a seven-row minimum)
+- [ ] if `extensions.workbuddy.slacking` is present: rows 7–10 exist, each has
+      frames `[0,1,2,3,4,5,6,7]`, thresholds are exactly
+      900/1500/2100/3600 seconds, and
+      `sharedFinal` is `true`
+- [ ] row 10 is pixel-identical across every slacking-enabled pack in the import batch
 - [ ] PNG background is transparent
 - [ ] each state is visually distinguishable at small size
 - [ ] a `license` is set if you plan to share it
