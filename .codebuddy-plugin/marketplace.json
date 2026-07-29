@@ -1,0 +1,27 @@
+{
+  "name": "workbuddy-buddy",
+  "description": "Official WorkBuddy integration for the workbuddy-buddy desktop pet.",
+  "owner": {
+    "name": "FlashFamily",
+    "url": "https://github.com/FlashFamily"
+  },
+  "metadata": {
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "workbuddy-buddy",
+      "description": "Privacy-safe WorkBuddy lifecycle bridge and fail-open desktop-pet approval UI.",
+      "version": "0.1.0",
+      "source": "./integrations/workbuddy-plugin",
+      "category": "productivity",
+      "author": {
+        "name": "FlashFamily"
+      },
+      "homepage": "https://github.com/FlashFamily/workbuddy-buddy",
+      "repository": "https://github.com/FlashFamily/workbuddy-buddy",
+      "license": "MIT",
+      "hooks": "./integrations/workbuddy-plugin/hooks/hooks.json"
+    }
+  ]
+}

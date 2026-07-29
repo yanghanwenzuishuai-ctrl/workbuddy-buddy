@@ -11,7 +11,7 @@
       content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'"
     >
     <link rel="icon" href="data:,">
-    <title>挂载 WorkBuddy 宠物</title>
+    <title>挂载 WorkBuddy Buddy 桌宠</title>
     <link rel="stylesheet" href="/start.css">
     <script src="/start.js" defer></script>
   </head>
@@ -36,7 +36,7 @@
           <p class="eyebrow">BRING YOUR BUDDY</p>
           <h1 id="page-title">把你的桌宠，<br>挂到同一间办公室。</h1>
           <p class="intro-copy">
-            选择形象、给它起名，然后用一次性配对码连接 WorkBuddy。
+            选择形象、给它起名，然后用一次性配对码连接 WorkBuddy Buddy 桌宠。
             挂载后，办公室会自动展示宠物的在线状态和摸鱼形态。
           </p>
 
@@ -47,7 +47,7 @@
             </li>
             <li data-progress-step="2">
               <span>2</span>
-              <div><b>输入配对码</b><small>在 WorkBuddy 内确认</small></div>
+              <div><b>打开桌宠并配对</b><small>在 WorkBuddy Buddy 内确认</small></div>
             </li>
             <li data-progress-step="3">
               <span>3</span>
@@ -73,6 +73,45 @@
               </div>
               <span>约 1 分钟</span>
             </div>
+
+            <section class="desktop-app-card is-prepare" aria-labelledby="prepare-app-title">
+              <div class="app-card-heading">
+                <span class="app-card-icon" aria-hidden="true">🐾</span>
+                <div>
+                  <p>连接前准备</p>
+                  <h3 id="prepare-app-title">先准备 WorkBuddy Buddy 桌宠</h3>
+                </div>
+                <span class="app-card-badge">独立桌宠</span>
+              </div>
+              <p class="app-distinction">
+                <b>官方 WorkBuddy</b> 是工作客户端；<b>WorkBuddy Buddy</b>
+                是连接咸鱼办公室的独立桌宠。即使已安装官方 WorkBuddy，也需要打开或安装桌宠。
+              </p>
+              <button id="prepare-buddy" class="open-buddy-button" type="button">
+                打开 WorkBuddy Buddy
+                <span aria-hidden="true">↗</span>
+              </button>
+              <div class="download-heading">
+                <b>没有安装桌宠？下载 macOS 版</b>
+                <small>不确定芯片型号时，请在“关于本机”中查看。</small>
+              </div>
+              <div class="download-choices" aria-label="macOS 桌宠下载">
+                <a href="/download/macos/arm64">
+                  <b>Apple 芯片（推荐）</b>
+                  <small>适用于 M 系列 Mac</small>
+                </a>
+                <a href="/download/macos/x64">
+                  <b>Intel 芯片</b>
+                  <small>适用于 Intel Mac</small>
+                </a>
+              </div>
+              <p class="platform-note">
+                网页无法可靠判断桌宠是否已安装或识别 Mac 芯片架构；Windows 桌宠正在开发中，暂不提供下载。
+              </p>
+              <p id="prepare-launch-hint" class="launch-hint" role="status">
+                点击“打开”后由系统尝试唤起桌宠；没有响应时，请下载对应的 macOS 安装包。
+              </p>
+            </section>
 
             <div class="field-grid">
               <label class="field">
@@ -255,7 +294,7 @@
             <div class="card-heading">
               <div>
                 <p class="eyebrow">STEP 02</p>
-                <h2>去 WorkBuddy 输入配对码</h2>
+                <h2>在 WorkBuddy Buddy 中完成配对</h2>
               </div>
               <span id="expiry-label">有效期 --:--</span>
             </div>
@@ -266,16 +305,55 @@
               <button id="copy-code" class="copy-button" type="button">复制配对码</button>
             </div>
 
+            <section class="desktop-app-card is-pairing" aria-labelledby="pairing-app-title">
+              <div class="app-card-heading">
+                <span class="app-card-icon" aria-hidden="true">🐾</span>
+                <div>
+                  <p>桌宠连接</p>
+                  <h3 id="pairing-app-title">打开桌宠并预填配对码</h3>
+                </div>
+                <span class="app-card-badge">需本机确认</span>
+              </div>
+              <p class="app-distinction">
+                下方按钮打开的是 <b>WorkBuddy Buddy 桌宠</b>，不是官方 WorkBuddy。
+                配对码会尝试预填，但仍需要你在桌宠中检查并确认。
+              </p>
+              <button id="open-buddy" class="open-buddy-button" type="button">
+                打开 WorkBuddy Buddy 并继续
+                <span aria-hidden="true">↗</span>
+              </button>
+              <div class="download-heading">
+                <b>点击后没有响应？下载 macOS 桌宠</b>
+                <small>浏览器无法可靠确认桌宠是否已安装。</small>
+              </div>
+              <div class="download-choices" aria-label="macOS 桌宠下载">
+                <a href="/download/macos/arm64">
+                  <b>Apple 芯片（推荐）</b>
+                  <small>适用于 M 系列 Mac</small>
+                </a>
+                <a href="/download/macos/x64">
+                  <b>Intel 芯片</b>
+                  <small>适用于 Intel Mac</small>
+                </a>
+              </div>
+              <p class="platform-note">
+                Windows 桌宠正在开发中，暂不提供下载；安装完成后回到本页，再次点击上方按钮即可。
+              </p>
+              <p id="pairing-launch-hint" class="launch-hint" role="status">
+                点击后系统会尝试打开桌宠。本页不会把“无响应”误判为“未安装”。
+              </p>
+            </section>
+
             <ol class="device-steps">
-              <li><span>1</span><p>打开 WorkBuddy 桌宠的<b>“挂载到办公室”</b>入口。</p></li>
-              <li><span>2</span><p>输入上面的配对码，并在本机确认授权。</p></li>
+              <li><span>1</span><p>点击上方按钮，唤起 <b>WorkBuddy Buddy 桌宠</b>。</p></li>
+              <li><span>2</span><p>检查预填的完整配对码，并在桌宠中确认授权。</p></li>
               <li><span>3</span><p>保持本页打开；连接成功后会自动进入办公室。</p></li>
             </ol>
 
             <div id="pairing-state" class="pairing-state is-pending" role="status">
               <span class="state-spinner" aria-hidden="true"></span>
               <div>
-                <b id="pairing-state-title">正在等待 WorkBuddy…</b>
+                <b id="pairing-state-title">正在等待 WorkBuddy Buddy…</b>
                 <small id="pairing-state-detail">本页会自动检测配对结果</small>
               </div>
             </div>

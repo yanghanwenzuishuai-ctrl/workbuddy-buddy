@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "workbuddy-buddy",
+  "version": "0.1.0",
+  "kind": "workbuddy-plugin",
+  "pluginDirectoryName": "workbuddy-buddy",
+  "pluginManifest": ".codebuddy-plugin/plugin.json",
+  "runtime": {
+    "name": "node",
+    "version": ">=18.0.0",
+    "networkDependencies": false
+  },
+  "platforms": [
+    "darwin-arm64",
+    "darwin-x64",
+    "win32-x64"
+  ],
+  "requiredFiles": [
+    ".codebuddy-plugin/plugin.json",
+    "hooks/hooks.json",
+    "scripts/approval-hook.mjs",
+    "scripts/status-hook.mjs",
+    "scripts/status-runtime.mjs"
+  ],
+  "dataContract": {
+    "spoolEnvironmentOverride": "WB_BUDDY_SPOOL",
+    "dataDirectoryEnvironmentOverride": "WB_BUDDY_DATA_DIR",
+    "defaultRelativePath": ".workbuddy-buddy/events.spool"
+  }
+}

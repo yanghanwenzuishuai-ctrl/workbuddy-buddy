@@ -7,7 +7,7 @@ Codex Pets ecosystem.
 ![status states](docs/img/states.png)
 
 ![license: MIT](https://img.shields.io/badge/license-MIT-blue)
-![platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
+![platform: macOS ARM64 + x64](https://img.shields.io/badge/platform-macOS%20ARM64%20%2B%20x64-lightgrey)
 ![built with Tauri](https://img.shields.io/badge/built%20with-Tauri%20v2-24C8DB)
 
 > **Not affiliated with, endorsed by, or connected to Tencent or WorkBuddy.**
@@ -32,20 +32,26 @@ Codex Pets ecosystem.
 - **Stays out of your way.** Only the pet's silhouette catches clicks — the
   transparent area around it is click-through, so the pet never blocks the window
   underneath. Toggle it from the tray.
-- **Private by construction.** The pet only ever sees the *shape* of events — never
-  your prompts, tool arguments, or messages. It runs fully local.
+- **Private by construction.** The WorkBuddy plugin projects a strict structural
+  event whitelist locally. Office mounting sends only derived status, heartbeat,
+  consent flags, and the selected bundled-pet ID — never prompts, replies, tool
+  arguments, paths, messages, or email content.
 
 ## Quick start
 
-**One line** — macOS, needs [Rust](https://rustup.rs) (the installer tells you if it's missing):
+Use the hosted Control Plane's `/start` page. It tries to open the installed
+desktop pet and, if that fails, offers separate downloads for Apple Silicon and
+Intel Macs. The desktop pet itself is not yet supported on Windows.
+
+After a signed GitHub Release is published, the equivalent one-line installer is:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install.sh | bash
 ```
 
-It fetches the source, builds the pet, installs the WorkBuddy hook (backing up
-your `settings.json`), and launches it. Then **fully restart WorkBuddy** (Cmd+Q,
-its config is cached at startup), open a folder, and run a task.
+It detects the Mac architecture, verifies the release checksum and app signature,
+installs into `~/Applications`, and launches the pet. It does not require Rust,
+Python, or a source checkout.
 
 <details>
 <summary>Or step by step</summary>
@@ -53,25 +59,23 @@ its config is cached at startup), open a folder, and run a task.
 ```sh
 git clone https://github.com/FlashFamily/workbuddy-buddy && cd workbuddy-buddy
 cargo test                      # state logic
-python3 hooks/test_privacy.py   # privacy contract
+npm test --prefix integrations/workbuddy-plugin
 
-# 1) install the hook into WorkBuddy (backs up settings.json), then restart WorkBuddy
-python3 hooks/install.py
-
-# 2) run the pet — pick one:
+# Run from source — pick one:
 cargo run -p wb-buddy-bridge    # browser pet  → http://127.0.0.1:8787
 cargo run -p wb-buddy-app       # native transparent floating window (macOS)
 ```
 </details>
 
-To get a proper `.app` (Dock icon, app name) install the Tauri CLI and bundle:
+To build a proper local `.app`:
 
 ```sh
-npm i -g @tauri-apps/cli
-tauri build --bundles app       # → target/release/bundle/macos/workbuddy-buddy.app
+npx --yes @tauri-apps/cli@2.11.4 build --bundles app
+codesign --force --deep --sign - target/release/bundle/macos/workbuddy-buddy.app
 ```
 
-Undo the hook anytime: `cp ~/.workbuddy/settings.json.wb-buddy-bak ~/.workbuddy/settings.json`
+Public releases are built separately for ARM64 and x64, and the release workflow
+refuses to publish without Apple signing and notarization credentials.
 
 ## Mount to an office (M2A preview)
 
@@ -80,9 +84,13 @@ public office and pairing this Mac:
 
 1. Open the Control Plane's `/start` page, choose the office name, buddy, and
    sharing options, then create a one-time pairing code.
-2. In the native app, choose **menu-bar tray → 挂载到办公室 / Connect office…**
-   and paste the code exactly as shown.
-3. Keep the browser page open while it checks the pairing status. After the app
+2. Click **Open WorkBuddy Buddy**. The `workbuddy-buddy://connect#code=…` deep
+   link opens the native panel and pre-fills the code, but never submits it.
+3. Check the complete code and click **确认挂载** in the pet.
+4. The app registers the formal `workbuddy-buddy@workbuddy-buddy` marketplace
+   plugin while preserving existing WorkBuddy settings and creating a private
+   backup. Restart WorkBuddy once when prompted.
+5. Keep the browser page open while it checks the pairing status. After the app
    claims the code, the page takes you to your live office.
 
 The app creates an Ed25519 device key during pairing. The private key stays in
@@ -116,18 +124,20 @@ exactly as if the pet weren't there.
 
 ## Privacy
 
-The pet reads **event shape only** — event name, timestamp, session id, tool
+The formal WorkBuddy plugin reads **event shape only** — event name, timestamp, session id, tool
 *name*, permission mode, notification kind, and a computed "did the agent end on a
 question?" flag. It **never** reads or stores prompt text, tool arguments, message
-bodies, titles, or transcript paths, and it runs fully local (loopback only). The
-projection happens in `hooks/project.py` before anything is written; the event
-spool is `0600` and size-capped. Enforced by `hooks/test_privacy.py`.
+bodies, titles, email data, or transcript paths. The projection happens in
+`integrations/workbuddy-plugin/scripts/status-runtime.mjs` before anything is
+written; the local spool is private, symlink-safe, and size-capped. Office
+mounting adds only signed derived status and heartbeat traffic. Enforced by the
+dependency-free plugin tests.
 
 ## How it works
 
 ```
-WorkBuddy  ──hook──▶  wb-buddy-hook.sh ──▶ events.spool (JSONL, structural-only)
-(lifecycle)          (privacy projector)         │
+WorkBuddy  ──formal plugin──▶ status-hook.mjs ──▶ events.spool (structural-only)
+(lifecycle)             (privacy projector)             │
                                           wb-buddy-watch  (robust spool tailer)
                                           wb-buddy-core   (7 core + 4 derived
                                             │              inactivity displays)

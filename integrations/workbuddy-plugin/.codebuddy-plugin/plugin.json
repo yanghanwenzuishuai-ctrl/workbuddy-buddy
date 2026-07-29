@@ -1,0 +1,19 @@
+{
+  "name": "workbuddy-buddy",
+  "version": "0.1.0",
+  "description": "Privacy-safe WorkBuddy lifecycle bridge and fail-open desktop-pet approval UI.",
+  "author": {
+    "name": "FlashFamily",
+    "url": "https://github.com/FlashFamily"
+  },
+  "homepage": "https://github.com/FlashFamily/workbuddy-buddy",
+  "repository": "https://github.com/FlashFamily/workbuddy-buddy",
+  "license": "MIT",
+  "keywords": [
+    "workbuddy",
+    "desktop-pet",
+    "hooks",
+    "privacy"
+  ],
+  "hooks": "./hooks/hooks.json"
+}

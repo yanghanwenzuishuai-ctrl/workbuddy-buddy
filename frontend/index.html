@@ -99,6 +99,14 @@
     background: #eef1f7; color: #687087; font-size: 11px; line-height: 1.45; }
   #connect .cstatus.ok { background: #e7f7ec; color: #28713a; }
   #connect .cstatus.err { background: #fff0ef; color: #9a3934; }
+  #connect .chost { display: flex; align-items: center; gap: 8px; padding: 8px 9px;
+    border: 1px solid #dde2ed; border-radius: 9px; background: rgba(255,255,255,.72); }
+  #connect .choststatus { flex: 1; margin: 0; color: #687087; font-size: 10px; line-height: 1.4; }
+  #connect .chostaction { flex: none; border: 1px solid #bcc6dc; border-radius: 8px;
+    padding: 6px 8px; background: #fff; color: #3f527f; font-size: 10px; font-weight: 700;
+    cursor: pointer; }
+  #connect .chostaction[hidden] { display: none; }
+  #connect .chostaction:disabled { cursor: wait; opacity: .55; }
   #connect .cprivacy { margin-top: auto; color: #959cad; font-size: 9px; line-height: 1.5; }
 </style>
 </head>
@@ -127,6 +135,10 @@
     </label>
     <button class="csubmit" type="button">确认挂载</button>
     <p class="cstatus" role="status" aria-live="polite">设备私钥只保存在系统钥匙串中。</p>
+    <div class="chost">
+      <p class="choststatus">正在检查 WorkBuddy…</p>
+      <button class="chostaction" type="button" hidden></button>
+    </div>
     <p class="cprivacy">仅上传派生状态与官方宠物 ID；不会上传 prompt、回复、工具参数、路径、会话或邮件内容。Agent Mail 邮箱验证将在后续版本单独接入。</p>
   </div>
   <div id="stage"><canvas id="pet" width="192" height="208"></canvas></div>
@@ -348,16 +360,69 @@ const $connect = document.getElementById("connect");
 const $connectCode = $connect.querySelector(".ccode");
 const $connectSubmit = $connect.querySelector(".csubmit");
 const $connectStatus = $connect.querySelector(".cstatus");
+const $connectHostStatus = $connect.querySelector(".choststatus");
+const $connectHostAction = $connect.querySelector(".chostaction");
+const PAIRING_CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+let workBuddyStatus = null;
 function setConnectStatus(message, kind = "") {
   $connectStatus.textContent = message;
   $connectStatus.className = "cstatus" + (kind ? " " + kind : "");
 }
-async function openConnect() {
+function renderWorkBuddyStatus(status) {
+  workBuddyStatus = status || null;
+  $connectHostAction.hidden = true;
+  if (!status) {
+    $connectHostStatus.textContent = "暂时无法检查 WorkBuddy 安装状态。";
+    return;
+  }
+  if (!status.hostInstalled) {
+    $connectHostStatus.textContent = "未检测到 WorkBuddy；先安装官方客户端，回来后可继续启用状态同步。";
+    $connectHostAction.textContent = "下载 WorkBuddy";
+    $connectHostAction.hidden = false;
+    return;
+  }
+  if (!status.pluginConfigured) {
+    $connectHostStatus.textContent = "已检测到 WorkBuddy；配对成功后会自动注册隐私安全的状态插件。";
+    $connectHostAction.textContent = "安装状态插件";
+    $connectHostAction.hidden = false;
+    return;
+  }
+  if (!status.marketplaceAvailable) {
+    $connectHostStatus.textContent = "状态插件已注册；重启 WorkBuddy 后会自动安装并生效。";
+    return;
+  }
+  $connectHostStatus.textContent = "WorkBuddy 状态插件已启用。";
+}
+async function refreshWorkBuddyStatus() {
+  const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  if (!invoke) return renderWorkBuddyStatus(null);
+  try {
+    renderWorkBuddyStatus(await invoke("workbuddy_integration_status"));
+  } catch (_) {
+    renderWorkBuddyStatus(null);
+  }
+}
+async function configureWorkBuddyPlugin() {
+  const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  if (!invoke) return null;
+  $connectHostAction.disabled = true;
+  try {
+    const status = await invoke("configure_workbuddy_plugin");
+    renderWorkBuddyStatus(status);
+    return status;
+  } finally {
+    $connectHostAction.disabled = false;
+  }
+}
+async function openConnect(prefillCode = null) {
   closePicker();
+  const hasPrefill = typeof prefillCode === "string" && PAIRING_CODE_PATTERN.test(prefillCode);
+  if (hasPrefill) $connectCode.value = prefillCode;
   $connect.classList.add("show");
   setConnectStatus("正在检查当前挂载状态…");
   reportHit();
   setTimeout(() => $connectCode.focus(), 0);
+  refreshWorkBuddyStatus();
   const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
   if (!invoke) {
     setConnectStatus("请从 WorkBuddy Buddy 桌面应用打开此面板。", "err");
@@ -374,9 +439,22 @@ async function openConnect() {
     } else {
       setConnectStatus("设备私钥只会写入系统钥匙串。");
     }
+    if (hasPrefill) {
+      setConnectStatus("配对码已预填；应用不会自动挂载，请核对后点击“确认挂载”。");
+    }
   } catch (_) {
     setConnectStatus("暂时无法读取挂载状态，请稍后重试。", "err");
   }
+}
+async function consumePendingConnect(openWithoutPending = false) {
+  const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  let request = null;
+  if (invoke) {
+    try { request = await invoke("take_pending_connect"); } catch (_) {}
+  }
+  const code = request && typeof request.pairingCode === "string"
+    && PAIRING_CODE_PATTERN.test(request.pairingCode) ? request.pairingCode : null;
+  if (request || openWithoutPending) await openConnect(code);
 }
 function closeConnect() {
   $connect.classList.remove("show");
@@ -385,8 +463,8 @@ function closeConnect() {
 async function submitPairing() {
   const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
   const pairingCode = $connectCode.value.trim();
-  if (!invoke || !pairingCode) {
-    setConnectStatus("请粘贴网页生成的完整配对码。", "err");
+  if (!invoke || !PAIRING_CODE_PATTERN.test(pairingCode)) {
+    setConnectStatus("请输入网页生成的 43 位完整配对码。", "err");
     return;
   }
   $connectSubmit.disabled = true;
@@ -394,7 +472,17 @@ async function submitPairing() {
   try {
     await invoke("pair_office", { pairingCode });
     $connectCode.value = "";
-    setConnectStatus("挂载成功！真实状态会在几秒内出现在办公室。", "ok");
+    let pluginStatus = null;
+    try {
+      pluginStatus = await configureWorkBuddyPlugin();
+    } catch (_) {}
+    if (pluginStatus && pluginStatus.hostInstalled && !pluginStatus.marketplaceAvailable) {
+      setConnectStatus("挂载成功！请重启一次 WorkBuddy，让状态插件安装并生效。", "ok");
+    } else if (pluginStatus && !pluginStatus.hostInstalled) {
+      setConnectStatus("挂载成功！安装 WorkBuddy 后，再点击下方“安装状态插件”。", "ok");
+    } else {
+      setConnectStatus("挂载成功！真实状态会在几秒内出现在办公室。", "ok");
+    }
   } catch (error) {
     setConnectStatus(typeof error === "string" ? error : "挂载失败，请重新生成配对码。", "err");
   } finally {
@@ -403,6 +491,24 @@ async function submitPairing() {
 }
 $connect.querySelector(".cclose").addEventListener("click", closeConnect);
 $connectSubmit.addEventListener("click", submitPairing);
+$connectHostAction.addEventListener("click", async () => {
+  const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+  if (!invoke) return;
+  if (!workBuddyStatus || !workBuddyStatus.hostInstalled) {
+    try { await invoke("open_workbuddy_download"); } catch (_) {
+      setConnectStatus("无法打开下载页，请访问 workbuddy.cn。", "err");
+    }
+    return;
+  }
+  try {
+    const status = await configureWorkBuddyPlugin();
+    if (status && status.pluginConfigured) {
+      setConnectStatus("状态插件已注册；重启一次 WorkBuddy 后自动生效。", "ok");
+    }
+  } catch (error) {
+    setConnectStatus(typeof error === "string" ? error : "状态插件安装失败，请稍后重试。", "err");
+  }
+});
 $connectCode.addEventListener("keydown", event => {
   if (event.key === "Enter") submitPairing();
 });
@@ -500,7 +606,7 @@ if (new URLSearchParams(location.search).has("embed")) document.body.classList.a
 if (window.__TAURI__ && window.__TAURI__.event) {
   window.__TAURI__.event.listen("pet-state", e => setState((e.payload || "").toString().trim()));
   window.__TAURI__.event.listen("open-picker", () => openPicker());
-  window.__TAURI__.event.listen("open-connect", () => openConnect());
+  window.__TAURI__.event.listen("open-connect", () => consumePendingConnect(true));
   window.__TAURI__.event.listen("pet-approval", e => { approvalQ.push(e.payload || {}); renderApproval(); });
   window.__TAURI__.event.listen("pet-approval-done", e => {
     const id = (e.payload || {}).id;
@@ -534,6 +640,9 @@ if (window.__TAURI__ && window.__TAURI__.event) {
   // keep the Rust side's click-through silhouette in sync as the sprite animates
   setInterval(reportHit, 150);
   reportHit();
+  // Cold-start deep links can arrive before the webview registers its event
+  // listener. Consume the one pending request after the bridge is ready.
+  consumePendingConnect(false);
 } else {
   // browser/bridge dev mode: double-click opens the picker; poll for state.
   document.getElementById("stage").addEventListener("dblclick", openPicker);

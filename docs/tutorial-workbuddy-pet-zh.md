@@ -1,5 +1,9 @@
 # 给你的 WorkBuddy 养只桌宠：hooks + 本地会话文件实战
 
+> **2026-07 更新：** 本文保留早期 Hook 调研过程供技术参考。当前版本已经改用
+> WorkBuddy 的正式 `.codebuddy-plugin` / marketplace 安装机制，不再由安装脚本向
+> `settings.json` 注入原始 Hook；公开安装也不再要求 Rust 或 Python。
+
 > 我给腾讯 WorkBuddy 做了一只开源桌面宠物 **workbuddy-buddy**：WorkBuddy 在思考、跑工具、等你确认还是干完了，屏幕角落这只小柴犬一眼就能看出来；甚至可以点它的气泡直接批权限、点它一下把 WorkBuddy 窗口拉到最前。
 >
 > 这篇把过程里最有料的部分拆开讲——**WorkBuddy 到底能不能挂 hook、本地会话文件长什么样、怎么在不碰你任何对话内容的前提下感知它的状态**。据我所知这是目前唯一一份 WorkBuddy hooks 的实测记录（官方还没有文档）。
@@ -166,13 +170,16 @@ WorkBuddy 要跑 Bash → hook 阻塞 → POST 到宠物的本地服务
 
 ## 六、上手 & 养你自己的宠物
 
-一条命令搞定（macOS，需要 Rust；没有的话脚本会提示你装）——拉源码、编译、装 hook（自动备份 `settings.json`）、启动桌宠：
+一条命令安装最新的签名 macOS Release。脚本会识别 Apple/Intel 芯片、校验
+SHA-256 与应用签名，然后安装到 `~/Applications`：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install.sh | bash
 ```
 
-装完**完全重启 WorkBuddy**（Cmd+Q，配置是启动时缓存的），打开一个工作目录跑个任务，桌宠就动起来了。
+打开咸鱼办公室 `/start` 页面生成配对码，点击网页按钮唤起桌宠，核对预填码后
+确认挂载。桌宠会注册正式 WorkBuddy marketplace 插件；按提示**完全重启一次
+WorkBuddy**（Cmd+Q），打开一个工作目录跑任务，桌宠就会跟着动。
 
 内置 15 只手绘伙伴，托盘「选择伙伴」或右键宠物切换：
 

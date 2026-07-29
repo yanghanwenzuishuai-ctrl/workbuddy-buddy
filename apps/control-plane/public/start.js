@@ -21,6 +21,11 @@
     "taro-tinker",
   ]);
   const POLL_INTERVAL_MS = 2_000;
+  const DESKTOP_APP_SCHEME = "workbuddy-buddy://connect";
+  const PREPARE_LAUNCH_HINT =
+    "点击“打开”后由系统尝试唤起桌宠；没有响应时，请下载对应的 macOS 安装包。";
+  const PAIRING_LAUNCH_HINT =
+    "点击后系统会尝试打开桌宠。本页不会把“无响应”误判为“未安装”。";
 
   const elements = {
     form: byId("onboarding-form"),
@@ -35,6 +40,10 @@
     pairingStateDetail: byId("pairing-state-detail"),
     officeLink: byId("office-link"),
     restartButton: byId("restart-button"),
+    prepareBuddy: byId("prepare-buddy"),
+    prepareLaunchHint: byId("prepare-launch-hint"),
+    openBuddy: byId("open-buddy"),
+    pairingLaunchHint: byId("pairing-launch-hint"),
   };
 
   let statusToken = null;
@@ -52,6 +61,8 @@
   elements.copyCode.addEventListener("click", () => {
     void copyPairingCode();
   });
+  elements.prepareBuddy.addEventListener("click", openBuddyWithoutCode);
+  elements.openBuddy.addEventListener("click", openBuddyWithPairing);
   elements.restartButton.addEventListener("click", resetPairing);
   window.addEventListener("beforeunload", stopTimers);
 
@@ -178,8 +189,15 @@
     elements.pairingCode.textContent = pairingCode;
     elements.form.hidden = true;
     elements.pairingPanel.hidden = false;
+    elements.openBuddy.disabled = false;
+    elements.pairingLaunchHint.textContent = PAIRING_LAUNCH_HINT;
+    elements.pairingLaunchHint.classList.remove("is-requested");
     setProgress(2);
-    setPairingState("pending", "正在等待 WorkBuddy…", "本页会自动检测配对结果");
+    setPairingState(
+      "pending",
+      "正在等待 WorkBuddy Buddy…",
+      "本页会自动检测配对结果",
+    );
     elements.officeLink.hidden = true;
     startCountdown();
     elements.pairingPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -246,7 +264,11 @@
       }
       if (status !== "pending") throw new Error("invalid_pairing_status");
 
-      setPairingState("pending", "正在等待 WorkBuddy…", "本页会自动检测配对结果");
+      setPairingState(
+        "pending",
+        "正在等待 WorkBuddy Buddy…",
+        "本页会自动检测配对结果",
+      );
     } catch {
       setPairingState("pending", "网络有一点波动", "仍在等待配对，将自动继续检测");
     }
@@ -258,6 +280,7 @@
     stopTimers();
     setProgress(3);
     elements.expiryLabel.textContent = "设备已连接";
+    elements.openBuddy.disabled = true;
     setPairingState("claimed", "配对成功！", "你的宠物已获得办公室工位");
     if (officeUrl === null) return;
     elements.officeLink.href = officeUrl;
@@ -270,6 +293,7 @@
   function expirePairing() {
     stopTimers();
     elements.expiryLabel.textContent = "配对码已过期";
+    elements.openBuddy.disabled = true;
     setPairingState("expired", "配对码已过期", "请重新创建一个一次性配对码");
   }
 
@@ -300,6 +324,32 @@
     }
   }
 
+  function openBuddyWithoutCode() {
+    elements.prepareLaunchHint.textContent =
+      "已请求系统打开 WorkBuddy Buddy。网页无法确认是否成功；没有响应时请下载 macOS 桌宠。";
+    elements.prepareLaunchHint.classList.add("is-requested");
+    navigateToDesktopApp(DESKTOP_APP_SCHEME, elements.prepareLaunchHint);
+  }
+
+  function openBuddyWithPairing() {
+    if (pairingCode === null) return;
+    void copyPairingCode();
+    elements.pairingLaunchHint.textContent =
+      "已请求系统打开 WorkBuddy Buddy，并尝试复制配对码。若没有响应，请先安装桌宠再点击一次。";
+    elements.pairingLaunchHint.classList.add("is-requested");
+    const target = `${DESKTOP_APP_SCHEME}#code=${encodeURIComponent(pairingCode)}`;
+    navigateToDesktopApp(target, elements.pairingLaunchHint);
+  }
+
+  function navigateToDesktopApp(target, hintElement) {
+    try {
+      window.location.assign(target);
+    } catch {
+      hintElement.textContent =
+        "浏览器未能请求打开桌宠。请下载或启动 WorkBuddy Buddy 后再试。";
+    }
+  }
+
   function resetPairing() {
     stopTimers();
     statusToken = null;
@@ -308,6 +358,11 @@
     officeUrl = null;
     elements.pairingPanel.hidden = true;
     elements.form.hidden = false;
+    elements.openBuddy.disabled = false;
+    elements.prepareLaunchHint.textContent = PREPARE_LAUNCH_HINT;
+    elements.prepareLaunchHint.classList.remove("is-requested");
+    elements.pairingLaunchHint.textContent = PAIRING_LAUNCH_HINT;
+    elements.pairingLaunchHint.classList.remove("is-requested");
     elements.officeLink.hidden = true;
     setProgress(1);
     hideFormError();

@@ -8,21 +8,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod approval;
+mod deep_link;
 mod edge;
 mod ux;
+mod workbuddy;
 
-use fs2::FileExt;
-use std::fs::{File, OpenOptions};
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     Emitter, Listener, Manager,
 };
 use wb_buddy_core::State;
-
-struct AppInstanceLock {
-    _file: File,
-}
 
 /// Bring the host agent app to the foreground (clicking the pet, Codex-pet style).
 /// Target app name is `WorkBuddy` by default; override with `WB_BUDDY_HOST_APP`.
@@ -42,12 +38,22 @@ fn activate_host() {
 
 fn main() {
     tauri::Builder::default()
+        // Must be registered first so a deep link targeting an already-running
+        // app is forwarded to that instance instead of starting a second pet.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            deep_link::focus_pet(app);
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
+            deep_link::take_pending_connect,
             edge::pair_office,
-            edge::edge_connection_status
+            edge::edge_connection_status,
+            workbuddy::workbuddy_integration_status,
+            workbuddy::configure_workbuddy_plugin,
+            workbuddy::open_workbuddy_download
         ])
         .setup(|app| {
-            acquire_instance_lock(app)?;
+            deep_link::setup(app)?;
             build_tray(app)?;
             approval::start(app.handle().clone());
             let edge = edge::EdgeManager::start(app)?;
@@ -72,25 +78,6 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running workbuddy-buddy");
-}
-
-fn acquire_instance_lock(app: &tauri::App) -> tauri::Result<()> {
-    let data_dir = app.path().app_data_dir()?;
-    std::fs::create_dir_all(&data_dir)?;
-    let lock_file = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(data_dir.join("workbuddy-buddy.instance.lock"))?;
-    lock_file.try_lock_exclusive().map_err(|error| {
-        std::io::Error::new(
-            error.kind(),
-            "another workbuddy-buddy process is already running",
-        )
-    })?;
-    app.manage(AppInstanceLock { _file: lock_file });
-    Ok(())
 }
 
 /// Build the menu-bar tray. The borderless pet window has no title bar, so the

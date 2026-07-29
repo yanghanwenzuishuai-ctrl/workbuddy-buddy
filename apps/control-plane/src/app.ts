@@ -5,6 +5,7 @@ import Fastify, {
 } from "fastify";
 
 import type { ControlPlaneConfig } from "./config.js";
+import { registerDesktopDownloadRoutes } from "./desktop-downloads.js";
 import { registerOnboardingPage } from "./onboarding-page.js";
 import { registerPublicOfficePage } from "./public-office-page.js";
 import { registerOnboardingRoutes } from "./modules/onboarding/application/onboarding-routes.js";
@@ -129,6 +130,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   });
   registerPublicOfficePage(app);
   registerOnboardingPage(app);
+  registerDesktopDownloadRoutes(app);
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof OnboardingProblem) {

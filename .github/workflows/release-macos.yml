@@ -1,0 +1,117 @@
+name: release macOS desktop app
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing app-vX.Y.Z tag to publish as a draft release
+        required: true
+        type: string
+  push:
+    tags:
+      - "app-v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: macos-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: macOS ${{ matrix.label }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple Silicon
+            target: aarch64-apple-darwin
+            asset: workbuddy-buddy_macos_arm64.dmg
+          - label: Intel
+            target: x86_64-apple-darwin
+            asset: workbuddy-buddy_macos_x64.dmg
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22.22.0
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Validate release tag and signing configuration
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          expected="app-v$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          test "$RELEASE_TAG" = "$expected"
+          test -n "$APPLE_CERTIFICATE"
+          test -n "$APPLE_CERTIFICATE_PASSWORD"
+          test -n "$APPLE_SIGNING_IDENTITY"
+          test -n "$APPLE_ID"
+          test -n "$APPLE_PASSWORD"
+          test -n "$APPLE_TEAM_ID"
+
+      - name: Install JavaScript dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Verify contracts and WorkBuddy plugin
+        run: |
+          npm run test:contracts
+          npm run typecheck:control-plane
+          npm run test:control-plane
+          npm test --prefix integrations/workbuddy-plugin
+          cargo test -p wb-buddy-app --locked
+
+      - name: Build signed and notarized DMG
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          releaseName: WorkBuddy Buddy v__VERSION__
+          releaseBody: |
+            Signed and notarized macOS desktop pet.
+
+            Choose Apple Silicon for M-series Macs, or Intel for Intel Macs.
+          releaseDraft: true
+          prerelease: false
+          args: --target ${{ matrix.target }} --bundles dmg
+
+      - name: Upload stable download name and checksum
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          ASSET_NAME: ${{ matrix.asset }}
+        run: |
+          source_dmg="$(find "target/${{ matrix.target }}/release/bundle/dmg" -maxdepth 1 -name '*.dmg' -print -quit)"
+          test -n "$source_dmg"
+          cp "$source_dmg" "$RUNNER_TEMP/$ASSET_NAME"
+          cd "$RUNNER_TEMP"
+          shasum -a 256 "$ASSET_NAME" > "$ASSET_NAME.sha256"
+          gh release upload "$RELEASE_TAG" \
+            "$ASSET_NAME" \
+            "$ASSET_NAME.sha256" \
+            --clobber

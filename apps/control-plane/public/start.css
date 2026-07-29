@@ -542,7 +542,8 @@ legend small {
 
 .primary-button,
 .secondary-button,
-.copy-button {
+.copy-button,
+.open-buddy-button {
   border: 0;
   cursor: pointer;
 }
@@ -593,6 +594,184 @@ legend small {
 
 .pairing-panel {
   display: grid;
+}
+
+.desktop-app-card {
+  display: grid;
+  gap: 0.68rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(115, 205, 232, 0.2);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 100% 0, rgba(115, 205, 232, 0.1), transparent 48%),
+    rgba(5, 17, 24, 0.42);
+}
+
+.desktop-app-card.is-pairing {
+  margin-top: 0.9rem;
+  margin-bottom: 0;
+}
+
+.app-card-heading {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.app-card-icon {
+  display: grid;
+  width: 2.2rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(120, 230, 196, 0.2);
+  border-radius: 0.7rem;
+  background: rgba(120, 230, 196, 0.07);
+}
+
+.app-card-heading p,
+.app-card-heading h3 {
+  margin: 0;
+}
+
+.app-card-heading p {
+  color: var(--cyan);
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.app-card-heading h3 {
+  margin-top: 0.08rem;
+  color: #edf8f5;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.app-card-badge {
+  padding: 0.28rem 0.45rem;
+  border: 1px solid rgba(115, 205, 232, 0.18);
+  border-radius: 999px;
+  color: var(--cyan);
+  background: rgba(115, 205, 232, 0.06);
+  font-size: 0.51rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.app-distinction,
+.platform-note,
+.launch-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.59rem;
+  line-height: 1.55;
+}
+
+.app-distinction b {
+  color: #e7f3f0;
+}
+
+.open-buddy-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(120, 230, 196, 0.38);
+  border-radius: 0.78rem;
+  color: #08271f;
+  background: linear-gradient(135deg, #8bf0cf, #65d8bd);
+  box-shadow: 0 0.7rem 1.5rem rgba(74, 209, 172, 0.1);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.open-buddy-button:hover {
+  filter: brightness(1.05);
+}
+
+.open-buddy-button:focus-visible,
+.download-choices a:focus-visible {
+  outline: 0.15rem solid rgba(115, 205, 232, 0.7);
+  outline-offset: 0.12rem;
+}
+
+.open-buddy-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+  opacity: 0.5;
+}
+
+.download-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.05rem;
+}
+
+.download-heading b {
+  color: #dce9e6;
+  font-size: 0.61rem;
+}
+
+.download-heading small {
+  color: var(--muted);
+  font-size: 0.52rem;
+  text-align: right;
+}
+
+.download-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.48rem;
+}
+
+.download-choices a {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  padding: 0.58rem 0.65rem;
+  border: 1px solid rgba(115, 205, 232, 0.16);
+  border-radius: 0.72rem;
+  color: #dff7f1;
+  background: rgba(115, 205, 232, 0.055);
+  text-decoration: none;
+}
+
+.download-choices a:hover {
+  border-color: rgba(115, 205, 232, 0.36);
+  background: rgba(115, 205, 232, 0.09);
+}
+
+.download-choices b {
+  overflow-wrap: anywhere;
+  font-size: 0.59rem;
+}
+
+.download-choices small {
+  color: var(--muted);
+  font-size: 0.51rem;
+}
+
+.platform-note {
+  padding-left: 0.6rem;
+  border-left: 0.12rem solid rgba(255, 209, 102, 0.45);
+  color: #b8c9c7;
+}
+
+.launch-hint {
+  min-height: 1.1rem;
+  color: #8fa9a7;
+}
+
+.launch-hint.is-requested {
+  color: var(--cyan);
 }
 
 .code-block {
@@ -915,6 +1094,35 @@ legend small {
 
   .consent-option {
     padding: 0.58rem;
+  }
+
+  .desktop-app-card {
+    padding: 0.72rem;
+  }
+
+  .app-card-heading {
+    grid-template-columns: 2rem minmax(0, 1fr);
+  }
+
+  .app-card-icon {
+    width: 2rem;
+  }
+
+  .app-card-badge {
+    display: none;
+  }
+
+  .download-heading {
+    display: grid;
+    gap: 0.14rem;
+  }
+
+  .download-heading small {
+    text-align: left;
+  }
+
+  .download-choices {
+    grid-template-columns: 1fr;
   }
 
   .card-heading {
