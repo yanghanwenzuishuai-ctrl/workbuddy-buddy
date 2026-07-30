@@ -43,15 +43,40 @@ Use the hosted Control Plane's `/start` page. It tries to open the installed
 desktop pet and, if that fails, offers separate downloads for Apple Silicon and
 Intel Macs. The desktop pet itself is not yet supported on Windows.
 
-After a signed GitHub Release is published, the equivalent one-line installer is:
+### Community build (available now)
+
+The community channel is built from the fixed `community-latest` GitHub Release
+for both Apple Silicon and Intel Macs. It uses an **ad-hoc signature**, so it
+does not require our Apple credentials:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install-community.sh | bash
+```
+
+The installer selects the correct architecture, strictly verifies the published
+SHA256 file and ad-hoc code-signing structure, mounts the DMG read-only, and
+copies the app into `~/Applications`. It never runs `xattr`, disables Gatekeeper,
+or terminates a running desktop pet.
+
+An ad-hoc signature checks the app bundle's code structure, but **does not
+establish Apple Developer ID trust and is not notarization**. If macOS blocks the
+first launch, open **System Settings → Privacy & Security**, find the WorkBuddy
+Buddy message, and choose **Open Anyway**. See
+[Apple's official instructions](https://support.apple.com/guide/mac-help/mh40616/mac).
+
+### Stable build (Developer ID + notarization)
+
+After a signed and notarized GitHub Release is published, use:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install.sh | bash
 ```
 
-It detects the Mac architecture, verifies the release checksum and app signature,
-installs into `~/Applications`, and launches the pet. It does not require Rust,
-Python, or a source checkout.
+The stable installer also detects the Mac architecture, verifies the release
+checksum and app signature, installs into `~/Applications`, and launches the
+pet. The stable release is intended for normal distribution without the
+community build's first-launch Gatekeeper exception. Neither installer requires
+Rust, Python, or a source checkout.
 
 <details>
 <summary>Or step by step</summary>
@@ -74,8 +99,10 @@ npx --yes @tauri-apps/cli@2.11.4 build --bundles app
 codesign --force --deep --sign - target/release/bundle/macos/workbuddy-buddy.app
 ```
 
-Public releases are built separately for ARM64 and x64, and the release workflow
-refuses to publish without Apple signing and notarization credentials.
+Stable releases are built separately for ARM64 and x64, and the stable release
+workflow refuses to publish without Apple signing and notarization credentials.
+The separate community channel remains explicitly ad-hoc and is intended for
+testing and early adopters.
 
 ## Mount to an office (M2A preview)
 

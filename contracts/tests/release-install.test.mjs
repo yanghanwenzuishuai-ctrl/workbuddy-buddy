@@ -2,10 +2,24 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [installer, workflow, downloads] = await Promise.all([
+const [
+  stableInstaller,
+  stableWorkflow,
+  communityInstaller,
+  communityWorkflow,
+  downloads,
+] = await Promise.all([
   readFile(new URL("../../install.sh", import.meta.url), "utf8"),
   readFile(
     new URL("../../.github/workflows/release-macos.yml", import.meta.url),
+    "utf8",
+  ),
+  readFile(new URL("../../install-community.sh", import.meta.url), "utf8"),
+  readFile(
+    new URL(
+      "../../.github/workflows/release-macos-community.yml",
+      import.meta.url,
+    ),
     "utf8",
   ),
   readFile(
@@ -18,18 +32,23 @@ for (const asset of [
   "workbuddy-buddy_macos_arm64.dmg",
   "workbuddy-buddy_macos_x64.dmg",
 ]) {
-  test(`${asset} is stable across build, web redirect, and installer`, () => {
-    assert.match(workflow, new RegExp(`asset: ${asset}`));
+  test(`${asset} is stable across both release channels`, () => {
+    assert.match(stableWorkflow, new RegExp(`asset: ${asset}`));
+    assert.match(stableInstaller, new RegExp(asset.replace(".", "\\.")));
+    assert.match(communityWorkflow, new RegExp(`asset: ${asset}`));
+    assert.match(communityInstaller, new RegExp(asset.replace(".", "\\.")));
     assert.match(downloads, new RegExp(asset.replace(".", "\\.")));
-    assert.match(installer, new RegExp(asset.replace(".", "\\.")));
   });
 }
 
 test("public installer verifies release integrity and never injects legacy hooks", () => {
-  assert.match(installer, /shasum -a 256/);
-  assert.match(installer, /codesign --verify --deep --strict/);
-  assert.match(installer, /hdiutil attach/);
-  assert.doesNotMatch(installer, /hooks\/install\.py|cargo build|sudo/);
+  assert.match(stableInstaller, /shasum -a 256/);
+  assert.match(stableInstaller, /codesign --verify --deep --strict/);
+  assert.match(stableInstaller, /hdiutil attach/);
+  assert.doesNotMatch(
+    stableInstaller,
+    /hooks\/install\.py|cargo build|sudo/,
+  );
 });
 
 test("public release is gated on Apple signing and notarization secrets", () => {
@@ -41,7 +60,29 @@ test("public release is gated on Apple signing and notarization secrets", () => 
     "APPLE_PASSWORD",
     "APPLE_TEAM_ID",
   ]) {
-    assert.match(workflow, new RegExp(`test -n "\\$${secret}"`));
+    assert.match(stableWorkflow, new RegExp(`test -n "\\$${secret}"`));
   }
-  assert.match(workflow, /releaseDraft: true/);
+  assert.match(stableWorkflow, /releaseDraft: true/);
+});
+
+test("community release is ad-hoc, fixed-tagged, and does not weaken stable", () => {
+  assert.match(communityWorkflow, /community-latest/);
+  assert.match(communityWorkflow, /--sign -/);
+  assert.match(communityWorkflow, /hdiutil create/);
+  assert.match(communityWorkflow, /gh release upload/);
+  assert.doesNotMatch(communityWorkflow, /secrets\.APPLE_/);
+
+  assert.match(downloads, /releases\/download\/community-latest/);
+  assert.match(downloads, /releases\/latest\/download/);
+});
+
+test("community installer verifies artifacts without disabling Gatekeeper", () => {
+  assert.match(communityInstaller, /community-latest/);
+  assert.match(communityInstaller, /shasum -a 256/);
+  assert.match(communityInstaller, /codesign --verify --deep --strict/);
+  assert.match(communityInstaller, /hdiutil attach/);
+  assert.doesNotMatch(
+    communityInstaller,
+    /hooks\/install\.py|cargo build|sudo|^[ \t]*xattr(?:[ \t]|$)/m,
+  );
 });

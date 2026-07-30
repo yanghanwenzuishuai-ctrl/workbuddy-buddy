@@ -56,6 +56,16 @@ test("macOS fallback exposes both architectures without pretending Windows is re
   assert.doesNotMatch(html, /\/download\/windows/i);
 });
 
+test("community download cards expose the optional verified terminal installer", () => {
+  const installCommand =
+    /curl -fsSL https:\/\/raw\.githubusercontent\.com\/FlashFamily\/workbuddy-buddy\/main\/install-community\.sh \| bash/g;
+  assert.equal((html.match(installCommand) ?? []).length, 2);
+  assert.equal((html.match(/终端安装（可选）/g) ?? []).length, 2);
+  assert.match(html, /校验 SHA256/);
+  assert.match(html, /不会自动关闭 Gatekeeper/);
+  assert.match(html, /不会清除 quarantine 标记/);
+});
+
 test("desktop app controls retain a narrow portrait layout", () => {
   assert.match(css, /@media \(max-width: 560px\)/);
   const mobile = css.slice(css.indexOf("@media (max-width: 560px)"));

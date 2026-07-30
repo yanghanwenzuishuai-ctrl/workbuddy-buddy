@@ -732,6 +732,28 @@ legend small {
   gap: 0.48rem;
 }
 
+.release-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.release-track span {
+  padding: 0.24rem 0.42rem;
+  border: 1px solid rgba(169, 220, 215, 0.12);
+  border-radius: 999px;
+  color: #7f9492;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 0.49rem;
+  font-weight: 800;
+}
+
+.release-track .is-current {
+  border-color: rgba(255, 209, 102, 0.24);
+  color: var(--gold);
+  background: rgba(255, 209, 102, 0.07);
+}
+
 .download-choices a {
   display: grid;
   gap: 0.1rem;
@@ -757,6 +779,68 @@ legend small {
 .download-choices small {
   color: var(--muted);
   font-size: 0.51rem;
+}
+
+.community-install-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  padding: 0.58rem 0.65rem;
+  border: 1px solid rgba(255, 209, 102, 0.18);
+  border-radius: 0.72rem;
+  color: #b8c9c7;
+  background: rgba(255, 209, 102, 0.045);
+  font-size: 0.53rem;
+  line-height: 1.55;
+}
+
+.community-install-note b {
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+.terminal-install {
+  min-width: 0;
+  padding: 0.52rem 0.62rem;
+  border: 1px solid rgba(115, 205, 232, 0.14);
+  border-radius: 0.72rem;
+  color: var(--muted);
+  background: rgba(4, 15, 22, 0.42);
+}
+
+.terminal-install summary {
+  color: #cbe3df;
+  font-size: 0.55rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.terminal-install summary::marker {
+  color: var(--cyan);
+}
+
+.terminal-install code {
+  display: block;
+  max-width: 100%;
+  margin-top: 0.52rem;
+  padding: 0.52rem 0.58rem;
+  border: 1px solid rgba(115, 205, 232, 0.12);
+  border-radius: 0.56rem;
+  color: #bcecdf;
+  background: rgba(2, 10, 15, 0.72);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.5rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  user-select: all;
+  white-space: pre-wrap;
+}
+
+.terminal-install p {
+  margin: 0.45rem 0 0;
+  color: #8fa9a7;
+  font-size: 0.5rem;
+  line-height: 1.5;
 }
 
 .platform-note {
@@ -1123,6 +1207,15 @@ legend small {
 
   .download-choices {
     grid-template-columns: 1fr;
+  }
+
+  .community-install-note {
+    grid-template-columns: 1fr;
+    gap: 0.18rem;
+  }
+
+  .community-install-note b {
+    white-space: normal;
   }
 
   .card-heading {

@@ -92,8 +92,12 @@
                 <span aria-hidden="true">↗</span>
               </button>
               <div class="download-heading">
-                <b>没有安装桌宠？下载 macOS 版</b>
-                <small>不确定芯片型号时，请在“关于本机”中查看。</small>
+                <b>没有安装桌宠？下载 macOS 社区测试版</b>
+                <small>正式稳定版将在后续开放。</small>
+              </div>
+              <div class="release-track" aria-label="当前发布渠道">
+                <span class="is-current">当前 · 社区测试版</span>
+                <span>未来 · 正式稳定版</span>
               </div>
               <div class="download-choices" aria-label="macOS 桌宠下载">
                 <a href="/download/macos/arm64">
@@ -105,11 +109,24 @@
                   <small>适用于 Intel Mac</small>
                 </a>
               </div>
+              <aside class="community-install-note">
+                <b>社区测试版采用 ad-hoc 构建</b>
+                <span>
+                  首次打开时 macOS 可能拦截。请前往“系统设置 → 隐私与安全性”，确认后选择“仍要打开”。
+                  本站不会自动清除 quarantine 标记。
+                </span>
+              </aside>
+              <details class="terminal-install">
+                <summary>终端安装（可选）</summary>
+                <code>curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install-community.sh | bash</code>
+                <p>脚本会下载对应芯片的 DMG 并校验 SHA256；不会自动关闭 Gatekeeper，也不会清除 quarantine 标记。</p>
+              </details>
               <p class="platform-note">
+                不确定芯片型号时，请在“关于本机”中查看。
                 网页无法可靠判断桌宠是否已安装或识别 Mac 芯片架构；Windows 桌宠正在开发中，暂不提供下载。
               </p>
               <p id="prepare-launch-hint" class="launch-hint" role="status">
-                点击“打开”后由系统尝试唤起桌宠；没有响应时，请下载对应的 macOS 安装包。
+                点击“打开”后由系统尝试唤起桌宠；没有响应时，请下载对应的 macOS 社区测试版。
               </p>
             </section>
 
@@ -323,8 +340,12 @@
                 <span aria-hidden="true">↗</span>
               </button>
               <div class="download-heading">
-                <b>点击后没有响应？下载 macOS 桌宠</b>
-                <small>浏览器无法可靠确认桌宠是否已安装。</small>
+                <b>点击后没有响应？下载 macOS 社区测试版</b>
+                <small>正式稳定版将在后续开放。</small>
+              </div>
+              <div class="release-track" aria-label="当前发布渠道">
+                <span class="is-current">当前 · 社区测试版</span>
+                <span>未来 · 正式稳定版</span>
               </div>
               <div class="download-choices" aria-label="macOS 桌宠下载">
                 <a href="/download/macos/arm64">
@@ -336,6 +357,18 @@
                   <small>适用于 Intel Mac</small>
                 </a>
               </div>
+              <aside class="community-install-note">
+                <b>社区测试版采用 ad-hoc 构建</b>
+                <span>
+                  首次打开时 macOS 可能拦截。请前往“系统设置 → 隐私与安全性”，确认后选择“仍要打开”。
+                  本站不会自动清除 quarantine 标记。
+                </span>
+              </aside>
+              <details class="terminal-install">
+                <summary>终端安装（可选）</summary>
+                <code>curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install-community.sh | bash</code>
+                <p>脚本会下载对应芯片的 DMG 并校验 SHA256；不会自动关闭 Gatekeeper，也不会清除 quarantine 标记。</p>
+              </details>
               <p class="platform-note">
                 Windows 桌宠正在开发中，暂不提供下载；安装完成后回到本页，再次点击上方按钮即可。
               </p>

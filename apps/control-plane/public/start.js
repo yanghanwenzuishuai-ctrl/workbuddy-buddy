@@ -23,7 +23,7 @@
   const POLL_INTERVAL_MS = 2_000;
   const DESKTOP_APP_SCHEME = "workbuddy-buddy://connect";
   const PREPARE_LAUNCH_HINT =
-    "点击“打开”后由系统尝试唤起桌宠；没有响应时，请下载对应的 macOS 安装包。";
+    "点击“打开”后由系统尝试唤起桌宠；没有响应时，请下载对应的 macOS 社区测试版。";
   const PAIRING_LAUNCH_HINT =
     "点击后系统会尝试打开桌宠。本页不会把“无响应”误判为“未安装”。";
 
@@ -326,7 +326,7 @@
 
   function openBuddyWithoutCode() {
     elements.prepareLaunchHint.textContent =
-      "已请求系统打开 WorkBuddy Buddy。网页无法确认是否成功；没有响应时请下载 macOS 桌宠。";
+      "已请求系统打开 WorkBuddy Buddy。网页无法确认是否成功；没有响应时请下载 macOS 社区测试版。";
     elements.prepareLaunchHint.classList.add("is-requested");
     navigateToDesktopApp(DESKTOP_APP_SCHEME, elements.prepareLaunchHint);
   }
@@ -335,7 +335,7 @@
     if (pairingCode === null) return;
     void copyPairingCode();
     elements.pairingLaunchHint.textContent =
-      "已请求系统打开 WorkBuddy Buddy，并尝试复制配对码。若没有响应，请先安装桌宠再点击一次。";
+      "已请求系统打开 WorkBuddy Buddy，并尝试复制配对码。若没有响应，请先安装 macOS 社区测试版再点击一次。";
     elements.pairingLaunchHint.classList.add("is-requested");
     const target = `${DESKTOP_APP_SCHEME}#code=${encodeURIComponent(pairingCode)}`;
     navigateToDesktopApp(target, elements.pairingLaunchHint);
