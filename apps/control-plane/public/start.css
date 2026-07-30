@@ -543,6 +543,7 @@ legend small {
 .primary-button,
 .secondary-button,
 .copy-button,
+.install-copy-button,
 .open-buddy-button {
   border: 0;
   cursor: pointer;
@@ -680,7 +681,7 @@ legend small {
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
-  min-height: 2.7rem;
+  min-height: 2.75rem;
   padding: 0.55rem 0.75rem;
   border: 1px solid rgba(120, 230, 196, 0.38);
   border-radius: 0.78rem;
@@ -695,7 +696,11 @@ legend small {
   filter: brightness(1.05);
 }
 
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.copy-button:focus-visible,
 .open-buddy-button:focus-visible,
+.install-copy-button:focus-visible,
 .download-choices a:focus-visible {
   outline: 0.15rem solid rgba(115, 205, 232, 0.7);
   outline-offset: 0.12rem;
@@ -724,6 +729,139 @@ legend small {
   color: var(--muted);
   font-size: 0.52rem;
   text-align: right;
+}
+
+.quick-install {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.78rem;
+  border: 1px solid rgba(120, 230, 196, 0.52);
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(circle at 100% 0, rgba(120, 230, 196, 0.18), transparent 52%),
+    linear-gradient(145deg, rgba(20, 62, 60, 0.7), rgba(5, 23, 29, 0.9));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.04),
+    0 0.75rem 1.9rem rgba(38, 185, 147, 0.12);
+}
+
+.quick-install-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.58rem;
+}
+
+.quick-install-heading div {
+  min-width: 0;
+}
+
+.quick-install-heading b,
+.quick-install-heading small {
+  display: block;
+}
+
+.quick-install-heading b {
+  color: #effbf7;
+  font-size: 0.71rem;
+}
+
+.quick-install-heading small {
+  margin-top: 0.15rem;
+  color: #abc2bf;
+  font-size: 0.52rem;
+  line-height: 1.5;
+}
+
+.quick-install-badge {
+  padding: 0.3rem 0.48rem;
+  border: 1px solid rgba(255, 209, 102, 0.34);
+  border-radius: 999px;
+  color: #172219;
+  background: linear-gradient(135deg, #ffe59c, var(--gold));
+  box-shadow: 0 0.35rem 0.9rem rgba(255, 209, 102, 0.12);
+  font-size: 0.51rem;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+
+.install-command-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.48rem;
+  min-width: 0;
+}
+
+.install-command-row code {
+  display: block;
+  min-width: 0;
+  padding: 0.66rem 0.7rem;
+  border: 1px solid rgba(115, 205, 232, 0.22);
+  border-radius: 0.65rem;
+  color: #c9f6ea;
+  background: rgba(1, 9, 14, 0.76);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.52rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  user-select: all;
+  white-space: nowrap;
+}
+
+.install-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  min-width: 5.5rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.72rem;
+  border: 1px solid rgba(120, 230, 196, 0.55);
+  border-radius: 0.65rem;
+  color: #08271f;
+  background: linear-gradient(135deg, #9af3d7, #69ddbf);
+  box-shadow: 0 0.5rem 1.1rem rgba(74, 209, 172, 0.15);
+  font-size: 0.58rem;
+  font-weight: 1000;
+  white-space: nowrap;
+  transition: filter 150ms ease, transform 150ms ease;
+}
+
+.install-copy-button:hover {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+
+.install-copy-button.is-success {
+  color: #102718;
+  background: linear-gradient(135deg, #ffe69e, var(--gold));
+}
+
+.install-copy-button.is-error {
+  border-color: rgba(255, 138, 112, 0.62);
+  color: #ffe0d9;
+  background: rgba(92, 35, 30, 0.8);
+}
+
+.install-copy-status {
+  min-height: 0.9rem;
+  margin: -0.12rem 0 0;
+  color: #9db8b4;
+  font-size: 0.5rem;
+  line-height: 1.45;
+}
+
+.install-copy-status.is-success {
+  color: var(--gold);
+}
+
+.install-copy-status.is-error {
+  color: #ffb8a9;
+}
+
+.download-heading.is-dmg {
+  margin-top: 0.18rem;
 }
 
 .download-choices {
@@ -756,29 +894,40 @@ legend small {
 
 .download-choices a {
   display: grid;
+  align-content: center;
   gap: 0.1rem;
   min-width: 0;
-  padding: 0.58rem 0.65rem;
-  border: 1px solid rgba(115, 205, 232, 0.16);
+  min-height: 3.1rem;
+  padding: 0.68rem 0.72rem;
+  border: 1px solid rgba(115, 205, 232, 0.28);
   border-radius: 0.72rem;
   color: #dff7f1;
-  background: rgba(115, 205, 232, 0.055);
+  background:
+    linear-gradient(145deg, rgba(115, 205, 232, 0.11), rgba(115, 205, 232, 0.045));
   text-decoration: none;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
 }
 
 .download-choices a:hover {
-  border-color: rgba(115, 205, 232, 0.36);
-  background: rgba(115, 205, 232, 0.09);
+  border-color: rgba(115, 205, 232, 0.56);
+  background: rgba(115, 205, 232, 0.14);
+  transform: translateY(-1px);
+}
+
+.download-choices a:first-child {
+  border-color: rgba(120, 230, 196, 0.42);
+  background:
+    linear-gradient(145deg, rgba(120, 230, 196, 0.14), rgba(120, 230, 196, 0.055));
 }
 
 .download-choices b {
   overflow-wrap: anywhere;
-  font-size: 0.59rem;
+  font-size: 0.64rem;
 }
 
 .download-choices small {
   color: var(--muted);
-  font-size: 0.51rem;
+  font-size: 0.52rem;
 }
 
 .community-install-note {
@@ -797,50 +946,6 @@ legend small {
 .community-install-note b {
   color: var(--gold);
   white-space: nowrap;
-}
-
-.terminal-install {
-  min-width: 0;
-  padding: 0.52rem 0.62rem;
-  border: 1px solid rgba(115, 205, 232, 0.14);
-  border-radius: 0.72rem;
-  color: var(--muted);
-  background: rgba(4, 15, 22, 0.42);
-}
-
-.terminal-install summary {
-  color: #cbe3df;
-  font-size: 0.55rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.terminal-install summary::marker {
-  color: var(--cyan);
-}
-
-.terminal-install code {
-  display: block;
-  max-width: 100%;
-  margin-top: 0.52rem;
-  padding: 0.52rem 0.58rem;
-  border: 1px solid rgba(115, 205, 232, 0.12);
-  border-radius: 0.56rem;
-  color: #bcecdf;
-  background: rgba(2, 10, 15, 0.72);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.5rem;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-  user-select: all;
-  white-space: pre-wrap;
-}
-
-.terminal-install p {
-  margin: 0.45rem 0 0;
-  color: #8fa9a7;
-  font-size: 0.5rem;
-  line-height: 1.5;
 }
 
 .platform-note {
@@ -890,6 +995,8 @@ legend small {
 }
 
 .copy-button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   padding: 0.4rem 0.72rem;
   border: 1px solid rgba(255, 209, 102, 0.22);
   border-radius: 999px;
@@ -1203,6 +1310,27 @@ legend small {
 
   .download-heading small {
     text-align: left;
+  }
+
+  .quick-install {
+    padding: 0.7rem;
+  }
+
+  .quick-install-heading {
+    grid-template-columns: 1fr;
+    gap: 0.42rem;
+  }
+
+  .quick-install-badge {
+    justify-self: start;
+  }
+
+  .install-command-row {
+    grid-template-columns: 1fr;
+  }
+
+  .install-copy-button {
+    width: 100%;
   }
 
   .download-choices {

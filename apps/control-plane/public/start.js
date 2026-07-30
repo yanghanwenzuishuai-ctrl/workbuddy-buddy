@@ -22,8 +22,6 @@
   ]);
   const POLL_INTERVAL_MS = 2_000;
   const DESKTOP_APP_SCHEME = "workbuddy-buddy://connect";
-  const PREPARE_LAUNCH_HINT =
-    "点击“打开”后由系统尝试唤起桌宠；没有响应时，请下载对应的 macOS 社区测试版。";
   const PAIRING_LAUNCH_HINT =
     "点击后系统会尝试打开桌宠。本页不会把“无响应”误判为“未安装”。";
 
@@ -40,8 +38,6 @@
     pairingStateDetail: byId("pairing-state-detail"),
     officeLink: byId("office-link"),
     restartButton: byId("restart-button"),
-    prepareBuddy: byId("prepare-buddy"),
-    prepareLaunchHint: byId("prepare-launch-hint"),
     openBuddy: byId("open-buddy"),
     pairingLaunchHint: byId("pairing-launch-hint"),
   };
@@ -61,7 +57,11 @@
   elements.copyCode.addEventListener("click", () => {
     void copyPairingCode();
   });
-  elements.prepareBuddy.addEventListener("click", openBuddyWithoutCode);
+  for (const button of document.querySelectorAll("[data-copy-install]")) {
+    button.addEventListener("click", () => {
+      void copyInstallCommand(button);
+    });
+  }
   elements.openBuddy.addEventListener("click", openBuddyWithPairing);
   elements.restartButton.addEventListener("click", resetPairing);
   window.addEventListener("beforeunload", stopTimers);
@@ -137,7 +137,7 @@
     } finally {
       createPending = false;
       elements.createButton.disabled = false;
-      elements.createButton.firstChild.textContent = "创建工位并生成配对码 ";
+      elements.createButton.firstChild.textContent = "生成有效配对码并继续 ";
     }
   }
 
@@ -185,7 +185,7 @@
   }
 
   function showPairingPanel() {
-    if (pairingCode === null) return;
+    if (pairingCode === null || !PAIRING_CODE_PATTERN.test(pairingCode)) return;
     elements.pairingCode.textContent = pairingCode;
     elements.form.hidden = true;
     elements.pairingPanel.hidden = false;
@@ -324,15 +324,68 @@
     }
   }
 
-  function openBuddyWithoutCode() {
-    elements.prepareLaunchHint.textContent =
-      "已请求系统打开 WorkBuddy Buddy。网页无法确认是否成功；没有响应时请下载 macOS 社区测试版。";
-    elements.prepareLaunchHint.classList.add("is-requested");
-    navigateToDesktopApp(DESKTOP_APP_SCHEME, elements.prepareLaunchHint);
+  async function copyInstallCommand(button) {
+    const panel = button.closest(".quick-install");
+    const command = panel?.querySelector("[data-install-command]");
+    const label = button.querySelector("[data-copy-label]");
+    const status = panel?.querySelector("[data-copy-status]");
+    if (command === null || command === undefined || label === null || status === null) return;
+
+    const defaultStatus = status.textContent;
+    try {
+      await writeClipboardText(command.textContent.trim());
+      label.textContent = "已复制";
+      button.classList.add("is-success");
+      button.classList.remove("is-error");
+      status.textContent = "命令已复制。现在打开“终端”，粘贴并按回车即可安装。";
+      status.classList.add("is-success");
+      status.classList.remove("is-error");
+    } catch {
+      label.textContent = "复制失败";
+      button.classList.add("is-error");
+      button.classList.remove("is-success");
+      status.textContent = "浏览器未允许自动复制，请长按或选中上方命令手动复制。";
+      status.classList.add("is-error");
+      status.classList.remove("is-success");
+    }
+
+    window.setTimeout(() => {
+      label.textContent = "复制命令";
+      button.classList.remove("is-success", "is-error");
+      status.textContent = defaultStatus;
+      status.classList.remove("is-success", "is-error");
+    }, 2_400);
+  }
+
+  async function writeClipboardText(value) {
+    if (navigator.clipboard !== undefined) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return;
+      } catch {
+        // Continue to the selection-based fallback for restricted browser contexts.
+      }
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = value;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.inset = "0 auto auto -9999px";
+    document.body.append(textArea);
+    textArea.select();
+    const copied = document.execCommand("copy");
+    textArea.remove();
+    if (!copied) throw new Error("Clipboard copy was rejected");
   }
 
   function openBuddyWithPairing() {
-    if (pairingCode === null) return;
+    if (pairingCode === null || !PAIRING_CODE_PATTERN.test(pairingCode)) {
+      elements.openBuddy.disabled = true;
+      elements.pairingLaunchHint.textContent =
+        "当前没有有效配对码。请返回上一步重新生成后再打开桌宠。";
+      return;
+    }
     void copyPairingCode();
     elements.pairingLaunchHint.textContent =
       "已请求系统打开 WorkBuddy Buddy，并尝试复制配对码。若没有响应，请先安装 macOS 社区测试版再点击一次。";
@@ -358,9 +411,7 @@
     officeUrl = null;
     elements.pairingPanel.hidden = true;
     elements.form.hidden = false;
-    elements.openBuddy.disabled = false;
-    elements.prepareLaunchHint.textContent = PREPARE_LAUNCH_HINT;
-    elements.prepareLaunchHint.classList.remove("is-requested");
+    elements.openBuddy.disabled = true;
     elements.pairingLaunchHint.textContent = PAIRING_LAUNCH_HINT;
     elements.pairingLaunchHint.classList.remove("is-requested");
     elements.officeLink.hidden = true;

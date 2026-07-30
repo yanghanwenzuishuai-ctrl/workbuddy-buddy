@@ -417,7 +417,7 @@ async function configureWorkBuddyPlugin() {
 async function openConnect(prefillCode = null) {
   closePicker();
   const hasPrefill = typeof prefillCode === "string" && PAIRING_CODE_PATTERN.test(prefillCode);
-  if (hasPrefill) $connectCode.value = prefillCode;
+  $connectCode.value = hasPrefill ? prefillCode : "";
   $connect.classList.add("show");
   setConnectStatus("正在检查当前挂载状态…");
   reportHit();

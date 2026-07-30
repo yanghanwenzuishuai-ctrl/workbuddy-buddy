@@ -78,22 +78,43 @@
               <div class="app-card-heading">
                 <span class="app-card-icon" aria-hidden="true">🐾</span>
                 <div>
-                  <p>连接前准备</p>
-                  <h3 id="prepare-app-title">先准备 WorkBuddy Buddy 桌宠</h3>
+                  <p>连接顺序</p>
+                  <h3 id="prepare-app-title">先生成有效配对码，再打开桌宠</h3>
                 </div>
                 <span class="app-card-badge">独立桌宠</span>
               </div>
               <p class="app-distinction">
                 <b>官方 WorkBuddy</b> 是工作客户端；<b>WorkBuddy Buddy</b>
-                是连接咸鱼办公室的独立桌宠。即使已安装官方 WorkBuddy，也需要打开或安装桌宠。
+                是连接咸鱼办公室的独立桌宠。请先完成下方设置并提交，服务器生成有效的一次性配对码后，
+                页面才会显示并启用“打开 WorkBuddy Buddy”。
               </p>
-              <button id="prepare-buddy" class="open-buddy-button" type="button">
-                打开 WorkBuddy Buddy
-                <span aria-hidden="true">↗</span>
-              </button>
-              <div class="download-heading">
-                <b>没有安装桌宠？下载 macOS 社区测试版</b>
-                <small>正式稳定版将在后续开放。</small>
+              <section class="quick-install" aria-label="最快安装方式">
+                <div class="quick-install-heading">
+                  <span class="quick-install-badge">推荐 · 最快</span>
+                  <div>
+                    <b>复制一行命令，自动安装桌宠</b>
+                    <small>打开“终端”，粘贴后按回车；脚本会自动识别 Apple 或 Intel 芯片。</small>
+                  </div>
+                </div>
+                <div class="install-command-row">
+                  <code data-install-command>curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install-community.sh | bash</code>
+                  <button
+                    class="install-copy-button"
+                    type="button"
+                    data-copy-install
+                    aria-label="复制终端安装命令"
+                  >
+                    <span aria-hidden="true">⧉</span>
+                    <span data-copy-label>复制命令</span>
+                  </button>
+                </div>
+                <p class="install-copy-status" data-copy-status aria-live="polite">
+                  自动下载对应芯片的 DMG 并校验 SHA256，不会关闭 Gatekeeper。
+                </p>
+              </section>
+              <div class="download-heading is-dmg">
+                <b>不想用终端？直接下载 macOS 应用</b>
+                <small>选择你的 Mac 芯片</small>
               </div>
               <div class="release-track" aria-label="当前发布渠道">
                 <span class="is-current">当前 · 社区测试版</span>
@@ -101,11 +122,11 @@
               </div>
               <div class="download-choices" aria-label="macOS 桌宠下载">
                 <a href="/download/macos/arm64">
-                  <b>Apple 芯片（推荐）</b>
-                  <small>适用于 M 系列 Mac</small>
+                  <b>下载 Apple 芯片版 ↘</b>
+                  <small>推荐 · 适用于 M 系列 Mac</small>
                 </a>
                 <a href="/download/macos/x64">
-                  <b>Intel 芯片</b>
+                  <b>下载 Intel 芯片版 ↘</b>
                   <small>适用于 Intel Mac</small>
                 </a>
               </div>
@@ -116,17 +137,12 @@
                   本站不会自动清除 quarantine 标记。
                 </span>
               </aside>
-              <details class="terminal-install">
-                <summary>终端安装（可选）</summary>
-                <code>curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install-community.sh | bash</code>
-                <p>脚本会下载对应芯片的 DMG 并校验 SHA256；不会自动关闭 Gatekeeper，也不会清除 quarantine 标记。</p>
-              </details>
               <p class="platform-note">
                 不确定芯片型号时，请在“关于本机”中查看。
                 网页无法可靠判断桌宠是否已安装或识别 Mac 芯片架构；Windows 桌宠正在开发中，暂不提供下载。
               </p>
-              <p id="prepare-launch-hint" class="launch-hint" role="status">
-                点击“打开”后由系统尝试唤起桌宠；没有响应时，请下载对应的 macOS 社区测试版。
+              <p class="launch-hint">
+                已安装桌宠也请先不要单独打开配对入口，避免使用无码或旧码；生成新配对码后再继续。
               </p>
             </section>
 
@@ -272,7 +288,10 @@
 
             <fieldset class="consent-fieldset">
               <legend>确认数据授权</legend>
-              <p>三项授权互相独立，不勾选的能力保持关闭。</p>
+              <p>
+                请逐项确认授权范围；统计和海报仍可按意愿开启。完成必需项后，
+                服务器才会生成本次有效配对码。
+              </p>
               <label class="consent-option">
                 <input id="presence-visible" name="presence_visible" type="checkbox" required>
                 <span class="check-mark" aria-hidden="true"></span>
@@ -301,7 +320,7 @@
 
             <p id="form-error" class="form-error" role="alert" hidden></p>
             <button id="create-button" class="primary-button" type="submit">
-              创建工位并生成配对码
+              生成有效配对码并继续
               <span aria-hidden="true">→</span>
             </button>
             <p class="privacy-line">🔒 配对码短时有效、仅可使用一次；不会上传任务正文。</p>
@@ -311,7 +330,7 @@
             <div class="card-heading">
               <div>
                 <p class="eyebrow">STEP 02</p>
-                <h2>在 WorkBuddy Buddy 中完成配对</h2>
+                <h2>有效配对码已生成，打开桌宠</h2>
               </div>
               <span id="expiry-label">有效期 --:--</span>
             </div>
@@ -327,21 +346,46 @@
                 <span class="app-card-icon" aria-hidden="true">🐾</span>
                 <div>
                   <p>桌宠连接</p>
-                  <h3 id="pairing-app-title">打开桌宠并预填配对码</h3>
+                  <h3 id="pairing-app-title">使用上方有效配对码打开桌宠</h3>
                 </div>
                 <span class="app-card-badge">需本机确认</span>
               </div>
               <p class="app-distinction">
                 下方按钮打开的是 <b>WorkBuddy Buddy 桌宠</b>，不是官方 WorkBuddy。
-                配对码会尝试预填，但仍需要你在桌宠中检查并确认。
+                页面只会在服务器成功生成并校验本次配对码后启用按钮；桌宠会尝试预填，
+                仍需要你在桌宠中检查并确认。
               </p>
-              <button id="open-buddy" class="open-buddy-button" type="button">
-                打开 WorkBuddy Buddy 并继续
+              <button id="open-buddy" class="open-buddy-button" type="button" disabled>
+                复制有效配对码并打开 WorkBuddy Buddy
                 <span aria-hidden="true">↗</span>
               </button>
-              <div class="download-heading">
-                <b>点击后没有响应？下载 macOS 社区测试版</b>
-                <small>正式稳定版将在后续开放。</small>
+              <section class="quick-install" aria-label="最快安装方式">
+                <div class="quick-install-heading">
+                  <span class="quick-install-badge">推荐 · 最快</span>
+                  <div>
+                    <b>复制一行命令，自动安装桌宠</b>
+                    <small>打开“终端”，粘贴后按回车；脚本会自动识别 Apple 或 Intel 芯片。</small>
+                  </div>
+                </div>
+                <div class="install-command-row">
+                  <code data-install-command>curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install-community.sh | bash</code>
+                  <button
+                    class="install-copy-button"
+                    type="button"
+                    data-copy-install
+                    aria-label="复制终端安装命令"
+                  >
+                    <span aria-hidden="true">⧉</span>
+                    <span data-copy-label>复制命令</span>
+                  </button>
+                </div>
+                <p class="install-copy-status" data-copy-status aria-live="polite">
+                  自动下载对应芯片的 DMG 并校验 SHA256，不会关闭 Gatekeeper。
+                </p>
+              </section>
+              <div class="download-heading is-dmg">
+                <b>不想用终端？直接下载 macOS 应用</b>
+                <small>选择你的 Mac 芯片</small>
               </div>
               <div class="release-track" aria-label="当前发布渠道">
                 <span class="is-current">当前 · 社区测试版</span>
@@ -349,11 +393,11 @@
               </div>
               <div class="download-choices" aria-label="macOS 桌宠下载">
                 <a href="/download/macos/arm64">
-                  <b>Apple 芯片（推荐）</b>
-                  <small>适用于 M 系列 Mac</small>
+                  <b>下载 Apple 芯片版 ↘</b>
+                  <small>推荐 · 适用于 M 系列 Mac</small>
                 </a>
                 <a href="/download/macos/x64">
-                  <b>Intel 芯片</b>
+                  <b>下载 Intel 芯片版 ↘</b>
                   <small>适用于 Intel Mac</small>
                 </a>
               </div>
@@ -364,11 +408,6 @@
                   本站不会自动清除 quarantine 标记。
                 </span>
               </aside>
-              <details class="terminal-install">
-                <summary>终端安装（可选）</summary>
-                <code>curl -fsSL https://raw.githubusercontent.com/FlashFamily/workbuddy-buddy/main/install-community.sh | bash</code>
-                <p>脚本会下载对应芯片的 DMG 并校验 SHA256；不会自动关闭 Gatekeeper，也不会清除 quarantine 标记。</p>
-              </details>
               <p class="platform-note">
                 Windows 桌宠正在开发中，暂不提供下载；安装完成后回到本页，再次点击上方按钮即可。
               </p>
@@ -378,9 +417,9 @@
             </section>
 
             <ol class="device-steps">
-              <li><span>1</span><p>点击上方按钮，唤起 <b>WorkBuddy Buddy 桌宠</b>。</p></li>
-              <li><span>2</span><p>检查预填的完整配对码，并在桌宠中确认授权。</p></li>
-              <li><span>3</span><p>保持本页打开；连接成功后会自动进入办公室。</p></li>
+              <li><span>1</span><p>确认上方已显示服务器刚生成的完整配对码。</p></li>
+              <li><span>2</span><p>点击按钮，复制配对码并唤起 <b>WorkBuddy Buddy 桌宠</b>。</p></li>
+              <li><span>3</span><p>在桌宠中检查预填配对码并确认；本页会自动检测结果。</p></li>
             </ol>
 
             <div id="pairing-state" class="pairing-state is-pending" role="status">
