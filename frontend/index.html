@@ -21,7 +21,7 @@
            padding: 6px 11px; font-size: 13px; cursor: pointer; color: #333; }
   .controls button.active { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
   body.embed .dev, body.embed .label { display: none; }
-  body.embed #stage { cursor: grab; }
+  body.embed #stage { cursor: grab; touch-action: none; }
   body.embed #stage:active { cursor: grabbing; }
 
   /* ---- approval bubble ---- */
@@ -32,7 +32,9 @@
   #approval.show { display: block; animation: pop .18s ease-out; }
   @keyframes pop { from { transform: translateX(-50%) scale(.92); opacity: 0; }
                    to   { transform: translateX(-50%) scale(1);   opacity: 1; } }
-  #approval .ahead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  #approval .ahead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+    min-height: 28px; cursor: grab; }
+  #approval .ahead:active { cursor: grabbing; }
   #approval .adot { width: 8px; height: 8px; border-radius: 50%; background: #b57ed4; flex: none;
     animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
@@ -57,9 +59,14 @@
   #picker { display: none; position: absolute; inset: 0; z-index: 30; flex-direction: column;
     background: rgba(248,249,252,.97); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
   #picker.show { display: flex; }
-  #picker .phead { display: flex; align-items: center; padding: 12px 14px 8px; gap: 8px; }
+  #picker .phead { display: flex; align-items: center; min-height: 52px; box-sizing: border-box;
+    padding: 6px 10px 6px 14px; gap: 8px; cursor: grab; position: sticky; top: 0; z-index: 2;
+    background: rgba(248,249,252,.98); border-bottom: 1px solid rgba(221,226,237,.75); }
+  #picker .phead:active { cursor: grabbing; }
+  .drag-grip { display: inline-grid; place-items: center; width: 22px; height: 32px; flex: none;
+    color: #929bb1; font-size: 16px; line-height: 1; letter-spacing: -3px; }
   #picker .phead b { font-size: 14px; color: #2b3350; flex: 1; }
-  #picker .pclose { border: none; background: #eef0f6; color: #667; width: 26px; height: 26px;
+  #picker .pclose { border: none; background: #eef0f6; color: #667; width: 44px; height: 44px;
     border-radius: 50%; font-size: 15px; cursor: pointer; line-height: 1; }
   #picker .pgrid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr;
     gap: 8px; padding: 4px 12px 8px; }
@@ -79,22 +86,29 @@
 
   /* ---- Control Plane pairing ---- */
   #connect { display: none; position: absolute; inset: 0; z-index: 35; box-sizing: border-box;
-    flex-direction: column; gap: 12px; padding: 14px;
+    flex-direction: column; gap: 10px; padding: 0 14px 14px;
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
     background: rgba(248,249,252,.98); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
   #connect.show { display: flex; }
-  #connect .chead { display: flex; align-items: center; gap: 8px; }
+  #connect > * { flex-shrink: 0; }
+  #connect .chead { display: flex; align-items: center; gap: 8px; min-height: 56px;
+    position: sticky; top: 0; z-index: 3; cursor: grab;
+    background: rgba(248,249,252,.98); border-bottom: 1px solid rgba(221,226,237,.75); }
+  #connect .chead:active { cursor: grabbing; }
   #connect .chead b { flex: 1; color: #2b3350; font-size: 15px; }
-  #connect .cclose { border: none; width: 28px; height: 28px; border-radius: 50%;
+  #connect .cclose { border: none; width: 44px; height: 44px; border-radius: 50%;
     background: #e9ecf4; color: #667085; cursor: pointer; }
+  #connect .cclose:disabled { cursor: wait; opacity: .55; }
   #connect .cintro { margin: 0; color: #687087; font-size: 11px; line-height: 1.55; }
   #connect label { color: #333d55; font-size: 11px; font-weight: 700; }
   #connect .ccode { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 11px 10px;
     border: 1px solid #cfd5e4; border-radius: 10px; outline: none; background: #fff;
     color: #25304a; font: 700 13px/1 ui-monospace, Menlo, monospace; letter-spacing: .03em; }
   #connect .ccode:focus { border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,.12); }
-  #connect .csubmit { border: 0; border-radius: 10px; padding: 10px;
+  #connect .csubmit { border: 0; border-radius: 10px; padding: 10px; min-height: 44px;
     background: #4a6cf7; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
   #connect .csubmit:disabled { cursor: wait; opacity: .55; }
+  #connect .csubmit.is-complete { background: #31945a; }
   #connect .cstatus { min-height: 34px; margin: 0; padding: 8px 9px; border-radius: 9px;
     background: #eef1f7; color: #687087; font-size: 11px; line-height: 1.45; }
   #connect .cstatus.ok { background: #e7f7ec; color: #28713a; }
@@ -103,29 +117,37 @@
     border: 1px solid #dde2ed; border-radius: 9px; background: rgba(255,255,255,.72); }
   #connect .choststatus { flex: 1; margin: 0; color: #687087; font-size: 10px; line-height: 1.4; }
   #connect .chostaction { flex: none; border: 1px solid #bcc6dc; border-radius: 8px;
-    padding: 6px 8px; background: #fff; color: #3f527f; font-size: 10px; font-weight: 700;
+    min-height: 44px; padding: 6px 8px; background: #fff; color: #3f527f; font-size: 10px; font-weight: 700;
     cursor: pointer; }
   #connect .chostaction[hidden] { display: none; }
   #connect .chostaction:disabled { cursor: wait; opacity: .55; }
   #connect .cprivacy { margin-top: auto; color: #959cad; font-size: 9px; line-height: 1.5; }
+  #connect button:focus-visible, #picker button:focus-visible, #picker .pcard:focus-visible {
+    outline: 3px solid rgba(74,108,247,.35); outline-offset: 2px; }
+  #connect button:active, #picker button:active { transform: translateY(1px); }
 </style>
 </head>
 <body>
   <div id="approval">
-    <div class="ahead"><span class="adot"></span><span class="atitle">WorkBuddy 权限请求</span><span class="count"></span></div>
+    <div class="ahead" data-tauri-drag-region="deep" title="按住拖动窗口"><span class="adot"></span><span class="atitle">WorkBuddy 权限请求</span><span class="count"></span></div>
     <span class="atool"></span>
     <div class="adetail"></div>
     <div class="arow"><button class="allow">允许</button><button class="deny">拒绝</button></div>
   </div>
   <div id="picker">
-    <div class="phead"><b>选择你的伙伴</b><button class="pclose" title="关闭">✕</button></div>
+    <div class="phead" data-tauri-drag-region="deep" title="按住拖动窗口">
+      <span class="drag-grip" aria-hidden="true">⠿</span>
+      <b>选择你的伙伴</b>
+      <button class="pclose" type="button" title="关闭" aria-label="关闭伙伴选择">✕</button>
+    </div>
     <div class="pgrid"></div>
     <div class="pfoot">把 pet 包放进 <code>~/.workbuddy-buddy/pets/</code> 即可添加自己的伙伴（打开此面板自动刷新）</div>
   </div>
   <div id="connect" role="dialog" aria-modal="true" aria-labelledby="connect-title">
-    <div class="chead">
+    <div class="chead" data-tauri-drag-region="deep" title="按住拖动窗口">
+      <span class="drag-grip" aria-hidden="true">⠿</span>
       <b id="connect-title">挂载到咸鱼办公室</b>
-      <button class="cclose" type="button" title="关闭">✕</button>
+      <button class="cclose" type="button" title="关闭" aria-label="关闭挂载面板">✕</button>
     </div>
     <p class="cintro">先在办公室网页点击“挂载 WorkBuddy”生成一次性配对码，再粘贴到这里。</p>
     <label>
@@ -333,6 +355,8 @@ function buildPicker(pets) {
     const card = document.createElement("div");
     card.className = "pcard"; card.dataset.key = petKey(p);
     card.title = p.description || p.displayName || p.id;
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
     card.appendChild(thumb(p));
     const name = document.createElement("div");
     name.className = "pname"; name.textContent = p.displayName || p.id;
@@ -342,7 +366,14 @@ function buildPicker(pets) {
       badge.className = "pbadge"; badge.textContent = "自定义";
       card.appendChild(badge);
     }
-    card.onclick = () => { loadPetDesc(p); closePicker(); };
+    const selectPet = () => { loadPetDesc(p); closePicker(); };
+    card.onclick = selectPet;
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectPet();
+      }
+    });
     grid.appendChild(card);
   });
   markPickerSelection();
@@ -350,8 +381,29 @@ function buildPicker(pets) {
 function markPickerSelection() {
   $picker.querySelectorAll(".pcard").forEach(c => c.classList.toggle("sel", c.dataset.key === activeKey));
 }
-async function openPicker() { await refreshLibrary(); markPickerSelection(); $picker.classList.add("show"); reportHit(); }
-function closePicker() { $picker.classList.remove("show"); reportHit(); }
+async function openPicker() {
+  if (pairingInFlight) {
+    setConnectStatus("正在完成当前挂载，请稍候；完成后即可切换伙伴。");
+    $connectSubmit.focus();
+    return;
+  }
+  const navigationId = ++panelNavigationId;
+  invalidatePairingAttempt();
+  await refreshLibrary();
+  if (navigationId !== panelNavigationId || pairingInFlight) return;
+  markPickerSelection();
+  $connect.classList.remove("show");
+  $picker.classList.add("show");
+  syncPanelMode();
+  reportHit();
+  setTimeout(() => $picker.querySelector(".pclose").focus(), 0);
+}
+function closePicker() {
+  panelNavigationId += 1;
+  $picker.classList.remove("show");
+  syncPanelMode();
+  reportHit();
+}
 $picker.querySelector(".pclose").addEventListener("click", closePicker);
 $picker.addEventListener("click", e => { if (e.target === $picker) closePicker(); });
 
@@ -359,14 +411,62 @@ $picker.addEventListener("click", e => { if (e.target === $picker) closePicker()
 const $connect = document.getElementById("connect");
 const $connectCode = $connect.querySelector(".ccode");
 const $connectSubmit = $connect.querySelector(".csubmit");
+const $connectClose = $connect.querySelector(".cclose");
 const $connectStatus = $connect.querySelector(".cstatus");
 const $connectHostStatus = $connect.querySelector(".choststatus");
 const $connectHostAction = $connect.querySelector(".chostaction");
 const PAIRING_CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 let workBuddyStatus = null;
+let pairingInFlight = false;
+let pairingComplete = false;
+let pairingAttemptId = 0;
+let panelNavigationId = 0;
+let panelModeOpen = false;
+let pendingConsumeInFlight = false;
+let pendingConsumeRequested = false;
+let deferredConnectRequest = null;
+let deferredOpenWithoutPending = false;
+
+function syncPanelMode() {
+  const open = $picker.classList.contains("show") || $connect.classList.contains("show");
+  if (open === panelModeOpen) return;
+  panelModeOpen = open;
+  const events = window.__TAURI__ && window.__TAURI__.event;
+  if (events) events.emit("window-panel-mode", { open });
+}
+
+function resetPairingControls() {
+  invalidatePairingAttempt();
+  pairingComplete = false;
+  $connectCode.disabled = false;
+  $connectSubmit.disabled = false;
+  $connectClose.disabled = false;
+  $connectHostAction.disabled = false;
+  $connectHostAction.hidden = true;
+  $connectHostStatus.textContent = "正在检查 WorkBuddy…";
+  workBuddyStatus = null;
+  $connectSubmit.textContent = "确认挂载";
+  $connectSubmit.classList.remove("is-complete");
+}
+
+function invalidatePairingAttempt() {
+  pairingAttemptId += 1;
+  pairingInFlight = false;
+}
+
+function showPairingComplete() {
+  pairingComplete = true;
+  $connectCode.disabled = true;
+  $connectSubmit.disabled = true;
+  $connectSubmit.textContent = "完成并返回桌宠";
+  $connectSubmit.classList.add("is-complete");
+}
 function setConnectStatus(message, kind = "") {
   $connectStatus.textContent = message;
   $connectStatus.className = "cstatus" + (kind ? " " + kind : "");
+}
+function isCurrentConnectNavigation(navigationId) {
+  return navigationId === panelNavigationId && $connect.classList.contains("show");
 }
 function renderWorkBuddyStatus(status) {
   workBuddyStatus = status || null;
@@ -393,36 +493,55 @@ function renderWorkBuddyStatus(status) {
   }
   $connectHostStatus.textContent = "WorkBuddy 状态插件已启用。";
 }
-async function refreshWorkBuddyStatus() {
+async function refreshWorkBuddyStatus(navigationId = null) {
   const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-  if (!invoke) return renderWorkBuddyStatus(null);
+  if (!invoke) {
+    if (navigationId === null || isCurrentConnectNavigation(navigationId)) {
+      renderWorkBuddyStatus(null);
+    }
+    return;
+  }
   try {
-    renderWorkBuddyStatus(await invoke("workbuddy_integration_status"));
+    const status = await invoke("workbuddy_integration_status");
+    if (navigationId === null || isCurrentConnectNavigation(navigationId)) {
+      renderWorkBuddyStatus(status);
+    }
   } catch (_) {
-    renderWorkBuddyStatus(null);
+    if (navigationId === null || isCurrentConnectNavigation(navigationId)) {
+      renderWorkBuddyStatus(null);
+    }
   }
 }
-async function configureWorkBuddyPlugin() {
+async function configureWorkBuddyPlugin(navigationId = panelNavigationId) {
   const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
   if (!invoke) return null;
-  $connectHostAction.disabled = true;
+  if (isCurrentConnectNavigation(navigationId)) $connectHostAction.disabled = true;
   try {
     const status = await invoke("configure_workbuddy_plugin");
-    renderWorkBuddyStatus(status);
+    if (isCurrentConnectNavigation(navigationId)) renderWorkBuddyStatus(status);
     return status;
   } finally {
-    $connectHostAction.disabled = false;
+    if (isCurrentConnectNavigation(navigationId)) $connectHostAction.disabled = false;
   }
 }
 async function openConnect(prefillCode = null) {
-  closePicker();
+  if (pairingInFlight) {
+    setConnectStatus("正在完成当前挂载，请稍候；完成后会自动处理新的配对链接。");
+    $connectSubmit.focus();
+    return;
+  }
+  panelNavigationId += 1;
+  const navigationId = panelNavigationId;
+  $picker.classList.remove("show");
+  resetPairingControls();
   const hasPrefill = typeof prefillCode === "string" && PAIRING_CODE_PATTERN.test(prefillCode);
   $connectCode.value = hasPrefill ? prefillCode : "";
   $connect.classList.add("show");
+  syncPanelMode();
   setConnectStatus("正在检查当前挂载状态…");
   reportHit();
-  setTimeout(() => $connectCode.focus(), 0);
-  refreshWorkBuddyStatus();
+  setTimeout(() => (hasPrefill ? $connectSubmit : $connectCode).focus(), 0);
+  refreshWorkBuddyStatus(navigationId);
   const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
   if (!invoke) {
     setConnectStatus("请从 WorkBuddy Buddy 桌面应用打开此面板。", "err");
@@ -430,6 +549,7 @@ async function openConnect(prefillCode = null) {
   }
   try {
     const status = await invoke("edge_connection_status");
+    if (!isCurrentConnectNavigation(navigationId)) return;
     if (status && status.connected) {
       setConnectStatus("这只桌宠已挂载。重新输入配对码会切换到新的办公室。", "ok");
     } else if (status && status.credential_expired) {
@@ -443,39 +563,87 @@ async function openConnect(prefillCode = null) {
       setConnectStatus("配对码已预填；应用不会自动挂载，请核对后点击“确认挂载”。");
     }
   } catch (_) {
-    setConnectStatus("暂时无法读取挂载状态，请稍后重试。", "err");
+    if (isCurrentConnectNavigation(navigationId)) {
+      setConnectStatus("暂时无法读取挂载状态，请稍后重试。", "err");
+    }
   }
 }
 async function consumePendingConnect(openWithoutPending = false) {
-  const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-  let request = null;
-  if (invoke) {
-    try { request = await invoke("take_pending_connect"); } catch (_) {}
+  deferredOpenWithoutPending ||= openWithoutPending;
+  pendingConsumeRequested = true;
+  // Coalesce concurrent cold-start/event consumers. If enrollment begins while
+  // Rust is handing us a request, retain it locally until that attempt finishes.
+  if (pairingInFlight || pendingConsumeInFlight) return;
+  pendingConsumeInFlight = true;
+  try {
+    const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+    while (pendingConsumeRequested && !pairingInFlight) {
+      pendingConsumeRequested = false;
+      let request = null;
+      if (invoke) {
+        try { request = await invoke("take_pending_connect"); } catch (_) {}
+      }
+      if (request) deferredConnectRequest = request;
+    }
+    if (pairingInFlight) return;
+
+    const request = deferredConnectRequest;
+    deferredConnectRequest = null;
+    const shouldOpenEmpty = deferredOpenWithoutPending
+      && !request
+      && !$connect.classList.contains("show");
+    deferredOpenWithoutPending = false;
+    const code = request && typeof request.pairingCode === "string"
+      && PAIRING_CODE_PATTERN.test(request.pairingCode) ? request.pairingCode : null;
+    if (request) await openConnect(code);
+    else if (shouldOpenEmpty) await openConnect(null);
+  } finally {
+    pendingConsumeInFlight = false;
+    if (pendingConsumeRequested && !pairingInFlight) {
+      setTimeout(() => consumePendingConnect(false), 0);
+    }
   }
-  const code = request && typeof request.pairingCode === "string"
-    && PAIRING_CODE_PATTERN.test(request.pairingCode) ? request.pairingCode : null;
-  if (request || openWithoutPending) await openConnect(code);
 }
 function closeConnect() {
+  if (pairingInFlight) {
+    setConnectStatus("正在完成挂载，请稍候；为避免凭证被切换，当前不能关闭。");
+    $connectSubmit.focus();
+    return;
+  }
+  panelNavigationId += 1;
+  invalidatePairingAttempt();
   $connect.classList.remove("show");
+  syncPanelMode();
   reportHit();
 }
 async function submitPairing() {
+  if (pairingComplete) {
+    closeConnect();
+    return;
+  }
+  if (pairingInFlight) return;
+  const attemptId = ++pairingAttemptId;
   const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
   const pairingCode = $connectCode.value.trim();
   if (!invoke || !PAIRING_CODE_PATTERN.test(pairingCode)) {
     setConnectStatus("请输入网页生成的 43 位完整配对码。", "err");
     return;
   }
+  panelNavigationId += 1;
+  const navigationId = panelNavigationId;
+  pairingInFlight = true;
   $connectSubmit.disabled = true;
+  $connectClose.disabled = true;
   setConnectStatus("正在生成设备密钥并完成挂载…");
   try {
     await invoke("pair_office", { pairingCode });
+    if (attemptId !== pairingAttemptId) return;
     $connectCode.value = "";
     let pluginStatus = null;
     try {
-      pluginStatus = await configureWorkBuddyPlugin();
+      pluginStatus = await configureWorkBuddyPlugin(navigationId);
     } catch (_) {}
+    if (attemptId !== pairingAttemptId) return;
     if (pluginStatus && pluginStatus.hostInstalled && !pluginStatus.marketplaceAvailable) {
       setConnectStatus("挂载成功！请重启一次 WorkBuddy，让状态插件安装并生效。", "ok");
     } else if (pluginStatus && !pluginStatus.hostInstalled) {
@@ -483,34 +651,78 @@ async function submitPairing() {
     } else {
       setConnectStatus("挂载成功！真实状态会在几秒内出现在办公室。", "ok");
     }
+    showPairingComplete();
   } catch (error) {
-    setConnectStatus(typeof error === "string" ? error : "挂载失败，请重新生成配对码。", "err");
+    if (attemptId === pairingAttemptId) {
+      setConnectStatus(typeof error === "string" ? error : "挂载失败，请重新生成配对码。", "err");
+    }
   } finally {
-    $connectSubmit.disabled = false;
+    if (attemptId === pairingAttemptId) {
+      pairingInFlight = false;
+      $connectSubmit.disabled = false;
+      $connectClose.disabled = false;
+      if (pairingComplete) $connectSubmit.focus();
+      // A deep link may have arrived while this attempt was running.
+      setTimeout(() => consumePendingConnect(false), 0);
+    }
   }
 }
-$connect.querySelector(".cclose").addEventListener("click", closeConnect);
+$connectClose.addEventListener("click", closeConnect);
 $connectSubmit.addEventListener("click", submitPairing);
 $connectHostAction.addEventListener("click", async () => {
   const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
   if (!invoke) return;
+  const navigationId = panelNavigationId;
   if (!workBuddyStatus || !workBuddyStatus.hostInstalled) {
     try { await invoke("open_workbuddy_download"); } catch (_) {
-      setConnectStatus("无法打开下载页，请访问 workbuddy.cn。", "err");
+      if (isCurrentConnectNavigation(navigationId)) {
+        setConnectStatus("无法打开下载页，请访问 workbuddy.cn。", "err");
+      }
     }
     return;
   }
   try {
-    const status = await configureWorkBuddyPlugin();
-    if (status && status.pluginConfigured) {
+    const status = await configureWorkBuddyPlugin(navigationId);
+    if (isCurrentConnectNavigation(navigationId) && status && status.pluginConfigured) {
       setConnectStatus("状态插件已注册；重启一次 WorkBuddy 后自动生效。", "ok");
     }
   } catch (error) {
-    setConnectStatus(typeof error === "string" ? error : "状态插件安装失败，请稍后重试。", "err");
+    if (isCurrentConnectNavigation(navigationId)) {
+      setConnectStatus(typeof error === "string" ? error : "状态插件安装失败，请稍后重试。", "err");
+    }
   }
 });
 $connectCode.addEventListener("keydown", event => {
-  if (event.key === "Enter") submitPairing();
+  if (event.key === "Enter") {
+    event.preventDefault();
+    submitPairing();
+  }
+});
+
+function trapPanelFocus(panel, event) {
+  const focusable = Array.from(panel.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter(element => element.getClientRects().length > 0);
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault(); last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault(); first.focus();
+  }
+}
+
+window.addEventListener("keydown", event => {
+  const activePanel = $connect.classList.contains("show")
+    ? $connect
+    : ($picker.classList.contains("show") ? $picker : null);
+  if (!activePanel) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    activePanel === $connect ? closeConnect() : closePicker();
+  } else if (event.key === "Tab") {
+    trapPanelFocus(activePanel, event);
+  }
 });
 
 // ---- approval bubble ----
@@ -581,7 +793,7 @@ function reportHit() {
   if (!bb || !r.width) {
     payload = { full: true };                       // panel up or not ready → whole window live
   } else {
-    const sx = r.width / canvas.width, sy = r.height / canvas.height, pad = 4;
+    const sx = r.width / canvas.width, sy = r.height / canvas.height, pad = 12;
     payload = { full: false,
       x: r.left + bb.minX * sx - pad, y: r.top + bb.minY * sy - pad,
       w: (bb.maxX - bb.minX + 1) * sx + pad * 2, h: (bb.maxY - bb.minY + 1) * sy + pad * 2 };

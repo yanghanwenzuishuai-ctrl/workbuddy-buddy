@@ -92,6 +92,13 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
         None::<&str>,
     )?;
     let toggle = MenuItem::with_id(app, "toggle", "Show / hide pet", true, None::<&str>)?;
+    let recenter = MenuItem::with_id(
+        app,
+        "recenter",
+        "移到屏幕中央 / Move on screen",
+        true,
+        None::<&str>,
+    )?;
     // Click-through defaults on (checked); the tray item lets the user disable it.
     let clickthrough = CheckMenuItem::with_id(
         app,
@@ -108,6 +115,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
             &buddy,
             &connect,
             &toggle,
+            &recenter,
             &clickthrough,
             &PredefinedMenuItem::separator(app)?,
             &quit,
@@ -124,6 +132,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
                 let _ = clickthrough.set_checked(on);
             }
             "buddy" => {
+                ux::ensure_visible(app);
                 if let Some(win) = app.get_webview_window("pet") {
                     let _ = win.show();
                     let _ = win.set_focus();
@@ -131,11 +140,22 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
                 let _ = app.emit("open-picker", ());
             }
             "connect" => {
+                ux::ensure_visible(app);
                 if let Some(win) = app.get_webview_window("pet") {
                     let _ = win.show();
                     let _ = win.set_focus();
                 }
                 let _ = app.emit("open-connect", ());
+            }
+            "recenter" => {
+                if let Some(win) = app.get_webview_window("pet") {
+                    let _ = win.show();
+                    let _ = win.unminimize();
+                }
+                ux::center_on_current_screen(app);
+                if let Some(win) = app.get_webview_window("pet") {
+                    let _ = win.set_focus();
+                }
             }
             "quit" => app.exit(0),
             "toggle" => {
@@ -144,6 +164,7 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
                     if visible {
                         let _ = win.hide();
                     } else {
+                        ux::ensure_visible(app);
                         let _ = win.show();
                         let _ = win.set_focus();
                     }

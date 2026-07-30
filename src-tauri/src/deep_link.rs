@@ -44,6 +44,7 @@ pub(crate) fn setup(app: &mut tauri::App) -> tauri::Result<()> {
 /// Called by the single-instance plugin even for an ordinary second launch.
 /// Deep-link parsing itself remains owned by the deep-link plugin.
 pub(crate) fn focus_pet(app: &AppHandle) {
+    crate::ux::ensure_visible(app);
     if let Some(window) = app.get_webview_window("pet") {
         let _ = window.show();
         let _ = window.unminimize();
