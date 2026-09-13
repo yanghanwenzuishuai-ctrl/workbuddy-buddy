@@ -46,16 +46,17 @@ impl State {
     }
 
     /// How long a state stays "live" before decaying toward Idle (milliseconds).
-    /// Lifetimes mirror Codex's official pet: Running 3m / Failed 1h / Waiting 24h / Review(→Done) 7d.
-    /// Solves the "there is no end-of-session event" problem without polling.
+    /// Tuned for personal daily use: Working/Thinking/Review/Waiting/Done are all
+    /// short-lived; Failed lingers 1h. Solves the "there is no end-of-session
+    /// event" problem without polling.
     pub fn ttl_ms(self) -> Option<u64> {
         match self {
             State::Working => Some(3 * 60 * 1000),
             State::Thinking => Some(2 * 60 * 1000),
             State::Review => Some(3 * 60 * 1000),
             State::Failed => Some(60 * 60 * 1000),
-            State::Waiting => Some(24 * 60 * 60 * 1000),
-            State::Done => Some(7 * 24 * 60 * 60 * 1000),
+            State::Waiting => Some(2 * 60 * 1000),
+            State::Done => Some(2 * 60 * 1000),
             State::Idle
             | State::SlackingFresh
             | State::SlackingSalted
@@ -111,8 +112,8 @@ impl DisplayState {
             DisplayState::Thinking => Some(2 * 60 * 1000),
             DisplayState::Review => Some(3 * 60 * 1000),
             DisplayState::Failed => Some(60 * 60 * 1000),
-            DisplayState::Waiting => Some(24 * 60 * 60 * 1000),
-            DisplayState::Done => Some(7 * 24 * 60 * 60 * 1000),
+            DisplayState::Waiting => Some(2 * 60 * 1000),
+            DisplayState::Done => Some(2 * 60 * 1000),
             DisplayState::Idle => None,
         }
     }
@@ -858,10 +859,13 @@ mod tests {
                 ends_with_question: false,
             },
         ));
-        assert_eq!(m.display_state(SLACKING_FRESH_MS - 1), State::Done);
+        // Done decays after 2min; the eligible-idle interval keeps running, so
+        // the slacking overlay still arrives at 15min of continuous inactivity.
+        assert_eq!(m.display_state(2 * MIN), State::Done);
+        assert_eq!(m.display_state(2 * MIN + 1), State::Idle);
         assert_eq!(m.display_state(SLACKING_FRESH_MS), State::SlackingFresh);
         let snapshot = m.snapshot(SLACKING_FRESH_MS);
-        assert_eq!(snapshot.display_state, DisplayState::Done);
+        assert_eq!(snapshot.display_state, DisplayState::Idle);
         assert_eq!(snapshot.activity_state, ActivityState::EligibleIdle);
         assert_eq!(snapshot.idle_stage, IdleStage::Fresh);
         assert_eq!(snapshot.activity_since, Some(0));
@@ -927,7 +931,8 @@ mod tests {
     fn waiting_and_failed_are_not_overridden_by_slacking() {
         let mut waiting = Machine::new();
         waiting.apply(&ev("s1", 0, HookKind::PermissionRequest));
-        assert_eq!(waiting.display_state(SLACKING_FISH_MS), State::Waiting);
+        assert_eq!(waiting.display_state(2 * MIN), State::Waiting);
+        assert_eq!(waiting.display_state(2 * MIN + 1), State::Idle);
 
         let mut failed = Machine::new();
         failed.apply(&ev(
@@ -987,34 +992,34 @@ mod tests {
     fn waiting_ttl_opens_a_new_eligible_interval_without_backdating() {
         let mut m = Machine::new();
         m.apply(&ev("s1", 0, HookKind::PermissionRequest));
-        assert_eq!(m.display_state(DAY), State::Waiting);
-        assert_eq!(m.display_state(DAY + 1), State::Idle);
-        assert_eq!(m.snapshot(DAY + 1).activity_since, Some(DAY + 1));
+        assert_eq!(m.display_state(2 * MIN), State::Waiting);
+        assert_eq!(m.display_state(2 * MIN + 1), State::Idle);
+        assert_eq!(m.snapshot(2 * MIN + 1).activity_since, Some(2 * MIN + 1));
         assert_eq!(
-            m.display_state(DAY + 1 + SLACKING_FRESH_MS),
+            m.display_state(2 * MIN + 1 + SLACKING_FRESH_MS),
             State::SlackingFresh
         );
     }
 
     #[test]
-    fn done_still_decays_after_seven_days_under_the_display_overlay() {
+    fn done_still_decays_after_two_minutes_under_the_display_overlay() {
         let entry = SessionEntry {
             display_state: DisplayState::Done,
             activity_state: ActivityState::EligibleIdle,
             display_since: 0,
             activity_since: 0,
         };
-        let at_ttl = effective(&entry, 7 * DAY);
+        let at_ttl = effective(&entry, 2 * MIN);
         assert_eq!(at_ttl.display_state, DisplayState::Done);
         assert_eq!(at_ttl.activity_since, 0);
-        let after_ttl = effective(&entry, 7 * DAY + 1);
+        let after_ttl = effective(&entry, 2 * MIN + 1);
         assert_eq!(after_ttl.display_state, DisplayState::Idle);
         assert_eq!(after_ttl.activity_since, 0);
     }
 
     #[test]
     fn stale_failed_decays_letting_live_waiting_win() {
-        // a: Failed (1h ttl) @0 ; b: Waiting (24h ttl) @0.
+        // a: Failed (1h ttl) @0 ; b: Waiting (2min ttl) @59min → live until 61min+1ms.
         let mut m = Machine::new();
         m.apply(&ev(
             "a",
@@ -1023,9 +1028,11 @@ mod tests {
                 kind: Some("error".into()),
             },
         ));
-        m.apply(&ev("b", 0, HookKind::PermissionRequest));
+        m.apply(&ev("b", HOUR - MIN, HookKind::PermissionRequest));
         assert_eq!(m.display_state(0), State::Failed); // both live → Failed wins
+        assert_eq!(m.display_state(HOUR), State::Failed); // Failed still live at its TTL boundary
         assert_eq!(m.display_state(HOUR + 1), State::Waiting); // Failed decayed, Waiting remains
+        assert_eq!(m.display_state(HOUR + 2 * MIN), State::Idle); // Waiting decayed too
     }
 
     #[test]
@@ -1132,18 +1139,25 @@ mod tests {
                 kind: Some("idle_prompt".into()),
             },
         ));
-        let snapshot = m.snapshot(SLACKING_FRESH_MS);
-        assert_eq!(snapshot.display_state, DisplayState::Waiting);
-        assert_eq!(snapshot.activity_state, ActivityState::EligibleIdle);
-        assert_eq!(snapshot.idle_stage, IdleStage::Fresh);
-        assert_eq!(snapshot.legacy_state(), State::SlackingFresh);
+        // Waiting is live for its 2min TTL, then decays to Idle while the
+        // eligible interval keeps running, so the slacking overlay applies.
+        let live = m.snapshot(2 * MIN);
+        assert_eq!(live.display_state, DisplayState::Waiting);
+        assert_eq!(live.activity_state, ActivityState::EligibleIdle);
+        assert_eq!(live.idle_stage, IdleStage::None);
+        assert_eq!(live.legacy_state(), State::Waiting);
+        let slacking = m.snapshot(SLACKING_FRESH_MS);
+        assert_eq!(slacking.display_state, DisplayState::Idle);
+        assert_eq!(slacking.activity_state, ActivityState::EligibleIdle);
+        assert_eq!(slacking.idle_stage, IdleStage::Fresh);
+        assert_eq!(slacking.legacy_state(), State::SlackingFresh);
     }
 
     #[test]
     fn approval_waiting_never_gets_legacy_slacking_overlay_while_live() {
         let mut m = Machine::new();
         m.apply(&ev("s", 0, HookKind::PermissionRequest));
-        let snapshot = m.snapshot(HOUR);
+        let snapshot = m.snapshot(2 * MIN);
         assert_eq!(snapshot.display_state, DisplayState::Waiting);
         assert_eq!(snapshot.activity_state, ActivityState::Waiting);
         assert_eq!(snapshot.idle_stage, IdleStage::None);
@@ -1195,28 +1209,22 @@ mod tests {
                 kind: Some("error".into()),
             },
         ));
-        m.apply(&ev("waiting", 0, HookKind::PermissionRequest));
+        // Waiting decays at 59min+1ms, so Failed (1h ttl) is the last blocker.
+        m.apply(&ev("waiting", HOUR - 3 * MIN, HookKind::PermissionRequest));
 
-        let first_expired = m.snapshot(HOUR + 1);
-        assert_eq!(first_expired.activity_state, ActivityState::Waiting);
-        assert_eq!(first_expired.idle_stage, IdleStage::None);
+        let before = m.snapshot(HOUR); // 60min: Failed still live at its TTL boundary
+        assert_eq!(before.activity_state, ActivityState::Failed);
+        assert_eq!(before.idle_stage, IdleStage::None);
 
-        let all_expired = m.snapshot(DAY + 1);
+        let all_expired = m.snapshot(HOUR + 1); // 60min+1ms: Failed finally expires
         assert_eq!(all_expired.activity_state, ActivityState::EligibleIdle);
-        assert_eq!(all_expired.activity_since, Some(DAY + 1));
+        assert_eq!(all_expired.activity_since, Some(HOUR + 1));
         assert_eq!(all_expired.idle_stage, IdleStage::None);
     }
 
     #[test]
     fn pruning_expired_blocker_does_not_backdate_global_idle_anchor() {
         let mut m = Machine::new();
-        m.apply(&ev(
-            "idle",
-            0,
-            HookKind::Stop {
-                ends_with_question: false,
-            },
-        ));
         m.apply(&ev(
             "failed",
             100,
@@ -1235,7 +1243,7 @@ mod tests {
                 kind: Some("info".into()),
             },
         ));
-        assert_eq!(m.tracked_sessions(), 1); // Done remains; expired Failed is pruned.
+        assert_eq!(m.tracked_sessions(), 0); // expired Failed pruned
         let snapshot = m.snapshot(decay_at);
         assert_eq!(snapshot.activity_since, Some(decay_at));
         assert_eq!(snapshot.idle_stage, IdleStage::None);
