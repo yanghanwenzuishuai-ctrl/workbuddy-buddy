@@ -166,6 +166,8 @@ fn display_state(state: DisplayState) -> &'static str {
         DisplayState::Waiting => "waiting",
         DisplayState::Done => "done",
         DisplayState::Failed => "failed",
+        DisplayState::Thinking => "thinking",
+        DisplayState::Review => "review",
     }
 }
 

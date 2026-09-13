@@ -273,12 +273,12 @@ mod tests {
         read_available(&path, &mut machine, &mut pos, &mut identity, 3);
         let snapshot = machine.snapshot(3);
 
-        assert_eq!(snapshot.display_state, wb_buddy_core::DisplayState::Working);
+        assert_eq!(snapshot.display_state, wb_buddy_core::DisplayState::Thinking);
         assert_eq!(
             snapshot.activity_state,
             wb_buddy_core::ActivityState::Active
         );
-        assert_eq!(snapshot.legacy_state(), State::Working);
+        assert_eq!(snapshot.legacy_state(), State::Thinking);
         assert!(pos > 0);
         let _ = std::fs::remove_file(path);
     }
@@ -369,7 +369,7 @@ mod tests {
         let mut m = Machine::new();
         let t1 = b"{\"event\":\"UserPromptSubmit\",\"session_id\":\"s\",\"ts\":1}\n{\"event\":\"St";
         let c1 = consume(&mut m, t1, 10);
-        assert_eq!(m.display_state(10), State::Working);
+        assert_eq!(m.display_state(10), State::Thinking);
         // run() advances pos by c1, so the next read re-includes the un-consumed bytes:
         let mut t2 = t1[c1..].to_vec();
         t2.extend_from_slice(b"op\",\"session_id\":\"s\",\"ts\":2}\n");

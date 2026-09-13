@@ -15,7 +15,9 @@ use std::collections::HashMap;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum State {
     Idle,
+    Thinking,
     Working,
+    Review,
     Waiting,
     Done,
     Failed,
@@ -33,6 +35,7 @@ impl State {
             State::Failed => 6,
             State::Waiting => 5,
             State::Working => 4,
+            State::Thinking | State::Review => 4,
             State::SlackingFresh
             | State::SlackingSalted
             | State::SlackingCostume
@@ -48,6 +51,8 @@ impl State {
     pub fn ttl_ms(self) -> Option<u64> {
         match self {
             State::Working => Some(3 * 60 * 1000),
+            State::Thinking => Some(2 * 60 * 1000),
+            State::Review => Some(3 * 60 * 1000),
             State::Failed => Some(60 * 60 * 1000),
             State::Waiting => Some(24 * 60 * 60 * 1000),
             State::Done => Some(7 * 24 * 60 * 60 * 1000),
@@ -62,7 +67,9 @@ impl State {
     pub fn as_str(self) -> &'static str {
         match self {
             State::Idle => "idle",
+            State::Thinking => "thinking",
             State::Working => "working",
+            State::Review => "review",
             State::Waiting => "waiting",
             State::Done => "done",
             State::Failed => "failed",
@@ -78,7 +85,9 @@ impl State {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DisplayState {
     Idle,
+    Thinking,
     Working,
+    Review,
     Waiting,
     Done,
     Failed,
@@ -90,6 +99,7 @@ impl DisplayState {
             DisplayState::Failed => 5,
             DisplayState::Waiting => 4,
             DisplayState::Working => 3,
+            DisplayState::Thinking | DisplayState::Review => 2,
             DisplayState::Done => 2,
             DisplayState::Idle => 1,
         }
@@ -98,6 +108,8 @@ impl DisplayState {
     fn ttl_ms(self) -> Option<u64> {
         match self {
             DisplayState::Working => Some(3 * 60 * 1000),
+            DisplayState::Thinking => Some(2 * 60 * 1000),
+            DisplayState::Review => Some(3 * 60 * 1000),
             DisplayState::Failed => Some(60 * 60 * 1000),
             DisplayState::Waiting => Some(24 * 60 * 60 * 1000),
             DisplayState::Done => Some(7 * 24 * 60 * 60 * 1000),
@@ -108,7 +120,9 @@ impl DisplayState {
     fn legacy(self) -> State {
         match self {
             DisplayState::Idle => State::Idle,
+            DisplayState::Thinking => State::Thinking,
             DisplayState::Working => State::Working,
+            DisplayState::Review => State::Review,
             DisplayState::Waiting => State::Waiting,
             DisplayState::Done => State::Done,
             DisplayState::Failed => State::Failed,
@@ -285,11 +299,14 @@ impl Machine {
 
         let next = match &ev.kind {
             HookKind::SessionStart => Some((DisplayState::Idle, ActivityState::EligibleIdle)),
-            HookKind::UserPromptSubmit => Some((DisplayState::Working, ActivityState::Active)),
-            // Tool use (read-only or not) means the agent is active. In the v0
-            // 5-state model this is "working"; a distinct Review state for
-            // read-only tools is a future refinement.
-            HookKind::PreToolUse { .. } => Some((DisplayState::Working, ActivityState::Active)),
+            HookKind::UserPromptSubmit => Some((DisplayState::Thinking, ActivityState::Active)),
+            // Tool use means the agent is active. Read-only tools (view/search/
+            // glob/grep/list...) map to a Review state; mutating tools to Working.
+            HookKind::PreToolUse { tool_name } => Some(if is_readonly_tool(tool_name) {
+                (DisplayState::Review, ActivityState::Active)
+            } else {
+                (DisplayState::Working, ActivityState::Active)
+            }),
             HookKind::PostToolUse { .. } => Some((DisplayState::Working, ActivityState::Active)),
             HookKind::PermissionRequest => Some((DisplayState::Waiting, ActivityState::Waiting)),
             HookKind::Notification { kind } => classify_notification(kind.as_deref()),
@@ -513,6 +530,40 @@ fn idle_stage(inactive_ms: u64) -> IdleStage {
 ///
 /// `idle`/`idle_prompt` is the intentional split case: the pet visually shows
 /// "your turn" while the interval is eligible for idle accounting.
+/// Heuristic: does this tool read rather than mutate? Used to split the
+/// legacy "working" state into Working (mutating) vs Review (read-only).
+/// Matches exact names and common read/query prefixes/suffixes so that
+/// `Read`, `Glob`, `Grep`, `List`, `Search`, `View`, `webSearch`,
+/// `getFileContents` etc. count as review; `Bash`, `Write`, `Edit`,
+/// `CreateFile`, `Append` etc. stay as working.
+fn is_readonly_tool(name: &str) -> bool {
+    let n = name.trim().to_lowercase();
+    if n.is_empty() {
+        return false;
+    }
+    const EXACT: &[&str] = &[
+        "read", "view", "glob", "grep", "list", "ls", "search", "lookup",
+        "fetch", "cat", "find", "stat", "head", "tail", "inspect", "peek",
+        "query", "select", "describe", "get", "show", "open", "todo_read",
+        "read_file", "list_dir", "search_files",
+    ];
+    if EXACT.contains(&n.as_str()) {
+        return true;
+    }
+    const PREFIX: &[&str] = &[
+        "read", "view", "glob", "grep", "list", "search", "fetch", "inspect",
+        "get_", "lookup", "query", "select", "show", "describe",
+    ];
+    if PREFIX.iter().any(|p| n.starts_with(p)) {
+        return true;
+    }
+    const SUFFIX: &[&str] = &[
+        "_read", "_view", "_search", "_list", "_inspect", "_get", "_fetch",
+        "_query", "_lookup",
+    ];
+    SUFFIX.iter().any(|s| n.ends_with(s))
+}
+
 fn classify_notification(kind: Option<&str>) -> Option<(DisplayState, ActivityState)> {
     let k = kind?.to_lowercase();
     if k.contains("error") || k.contains("fail") {
@@ -555,10 +606,10 @@ mod tests {
     }
 
     #[test]
-    fn prompt_then_stop_goes_working_then_done() {
+    fn prompt_then_stop_goes_thinking_then_done() {
         let mut m = Machine::new();
         m.apply(&ev("s1", 1000, HookKind::UserPromptSubmit));
-        assert_eq!(m.display_state(1000), State::Working);
+        assert_eq!(m.display_state(1000), State::Thinking);
         m.apply(&ev(
             "s1",
             2000,
@@ -581,7 +632,7 @@ mod tests {
                 tool_name: "Read".into(),
             },
         ));
-        assert_eq!(m.display_state(1), State::Working);
+        assert_eq!(m.display_state(1), State::Review);
     }
 
     #[test]
@@ -681,7 +732,7 @@ mod tests {
     }
 
     #[test]
-    fn informational_notification_does_not_override_working() {
+    fn informational_notification_does_not_override_thinking() {
         let mut m = Machine::new();
         m.apply(&ev("s1", 0, HookKind::UserPromptSubmit));
         m.apply(&ev(
@@ -692,7 +743,7 @@ mod tests {
             },
         ));
         let snapshot = m.snapshot(10);
-        assert_eq!(snapshot.display_state, DisplayState::Working);
+        assert_eq!(snapshot.display_state, DisplayState::Thinking);
         assert_eq!(snapshot.activity_state, ActivityState::Active);
         assert_eq!(snapshot.activity_since, Some(0));
     }
@@ -725,11 +776,11 @@ mod tests {
     #[test]
     fn arbitration_breaks_priority_ties_by_recency() {
         let mut m = Machine::new();
-        m.apply(&ev("a", 0, HookKind::UserPromptSubmit)); // Working @0
-        m.apply(&ev("b", 500, HookKind::UserPromptSubmit)); // Working @500
-                                                            // both Working (priority tie) → most recent wins; observable via since,
-                                                            // asserted here by keeping both live and confirming state is Working.
-        assert_eq!(m.display_state(500), State::Working);
+        m.apply(&ev("a", 0, HookKind::UserPromptSubmit)); // Thinking @0
+        m.apply(&ev("b", 500, HookKind::UserPromptSubmit)); // Thinking @500
+                                                            // both Thinking (priority tie) → most recent wins; observable via since,
+                                                            // asserted here by keeping both live and confirming state is Thinking.
+        assert_eq!(m.display_state(500), State::Thinking);
     }
 
     #[test]
@@ -898,17 +949,17 @@ mod tests {
 
     // ---- TTL decay (per state, boundary, combined with arbitration) --------
     #[test]
-    fn working_decays_at_its_own_ttl_boundary() {
+    fn thinking_decays_at_its_own_ttl_boundary() {
         let mut m = Machine::new();
-        m.apply(&ev("s1", 0, HookKind::UserPromptSubmit)); // Working, ttl 3min
-        assert_eq!(m.display_state(3 * MIN), State::Working); // exactly at TTL: still live
-        assert_eq!(m.display_state(3 * MIN + 1), State::Idle); // just past: decayed
-        let after_decay = m.snapshot(3 * MIN + 1);
+        m.apply(&ev("s1", 0, HookKind::UserPromptSubmit)); // Thinking, ttl 2min
+        assert_eq!(m.display_state(2 * MIN), State::Thinking); // exactly at TTL: still live
+        assert_eq!(m.display_state(2 * MIN + 1), State::Idle); // just past: decayed
+        let after_decay = m.snapshot(2 * MIN + 1);
         assert_eq!(after_decay.activity_state, ActivityState::EligibleIdle);
-        assert_eq!(after_decay.activity_since, Some(3 * MIN + 1));
+        assert_eq!(after_decay.activity_since, Some(2 * MIN + 1));
         assert_eq!(after_decay.idle_stage, IdleStage::None);
         assert_eq!(
-            m.snapshot(3 * MIN + 1 + SLACKING_FRESH_MS).idle_stage,
+            m.snapshot(2 * MIN + 1 + SLACKING_FRESH_MS).idle_stage,
             IdleStage::Fresh
         );
     }
@@ -987,14 +1038,14 @@ mod tests {
             ),
             (
                 HookKind::UserPromptSubmit,
-                DisplayState::Working,
+                DisplayState::Thinking,
                 ActivityState::Active,
             ),
             (
                 HookKind::PreToolUse {
                     tool_name: "Read".into(),
                 },
-                DisplayState::Working,
+                DisplayState::Review,
                 ActivityState::Active,
             ),
             (
@@ -1293,7 +1344,7 @@ mod tests {
         m.apply_at(&ev("s", u64::MAX, HookKind::SessionStart), HOUR);
         m.apply_at(&ev("s", 1, HookKind::UserPromptSubmit), HOUR + 1);
         let recovered = m.snapshot(HOUR + 1);
-        assert_eq!(recovered.display_state, DisplayState::Working);
+        assert_eq!(recovered.display_state, DisplayState::Thinking);
         assert_eq!(recovered.activity_state, ActivityState::Active);
         assert_eq!(recovered.activity_since, Some(HOUR + 1));
     }
@@ -1303,7 +1354,7 @@ mod tests {
         // An event stamped ahead of `now` (clock skew) must not underflow/decay.
         let mut m = Machine::new();
         m.apply(&ev("s1", 10_000, HookKind::UserPromptSubmit));
-        assert_eq!(m.display_state(0), State::Working);
+        assert_eq!(m.display_state(0), State::Thinking);
     }
 
     // ---- eviction / bounded memory ----------------------------------------
@@ -1316,6 +1367,6 @@ mod tests {
         // A later event prunes everything that has decayed to Idle.
         m.apply(&ev("live", 10 * DAY, HookKind::UserPromptSubmit));
         assert_eq!(m.tracked_sessions(), 1);
-        assert_eq!(m.display_state(10 * DAY), State::Working);
+        assert_eq!(m.display_state(10 * DAY), State::Thinking);
     }
 }

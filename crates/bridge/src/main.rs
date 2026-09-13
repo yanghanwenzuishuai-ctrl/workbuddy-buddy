@@ -28,6 +28,8 @@ fn state_code(s: State) -> u8 {
         State::SlackingSalted => 6,
         State::SlackingCostume => 7,
         State::SlackingFish => 8,
+        State::Thinking => 9,
+        State::Review => 10,
     }
 }
 
@@ -41,6 +43,8 @@ fn state_str(code: u8) -> &'static str {
         6 => "slacking_salted",
         7 => "slacking_costume",
         8 => "slacking_shared_fish",
+        9 => "thinking",
+        10 => "review",
         _ => "idle",
     }
 }
@@ -143,6 +147,8 @@ mod tests {
             (State::SlackingSalted, 6, "slacking_salted"),
             (State::SlackingCostume, 7, "slacking_costume"),
             (State::SlackingFish, 8, "slacking_shared_fish"),
+            (State::Thinking, 9, "thinking"),
+            (State::Review, 10, "review"),
         ];
 
         for (state, code, wire) in cases {
