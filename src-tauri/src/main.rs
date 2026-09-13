@@ -53,6 +53,10 @@ fn main() {
             workbuddy::open_workbuddy_download
         ])
         .setup(|app| {
+            // Accessory mode: no Dock icon / Cmd+Tab entry. The pet is managed
+            // entirely via the menu-bar tray and its always-on-top window.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             deep_link::setup(app)?;
             build_tray(app)?;
             approval::start(app.handle().clone());
