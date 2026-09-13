@@ -217,6 +217,11 @@ async function loadPetDesc(p) {
     });
     pet = meta; sheet = img;
     canvas.width = pet.frame.width; canvas.height = pet.frame.height;
+    // Optional per-pet display scale (default 1). The CSS shows the canvas at
+    // 288px wide; smaller pets scale down so they take less screen space.
+    const scale = Number(meta.displayScale) || 1;
+    canvas.style.width = (288 * scale) + "px";
+    canvas.style.height = "auto";
     ctx.imageSmoothingEnabled = false;
     frameIdx = 0; acc = 0;
     activeKey = petKey(p);
