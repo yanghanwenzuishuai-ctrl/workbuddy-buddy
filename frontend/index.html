@@ -217,11 +217,19 @@ async function loadPetDesc(p) {
     });
     pet = meta; sheet = img;
     canvas.width = pet.frame.width; canvas.height = pet.frame.height;
-    // Optional per-pet display scale (default 1). The CSS shows the canvas at
-    // 288px wide; smaller pets scale down so they take less screen space.
+    // Optional per-pet display scale (default 1). Shrink the canvas AND the
+    // window together so a compact pet takes minimal screen space and its
+    // transparent margins don't block clicks on what's behind.
     const scale = Number(meta.displayScale) || 1;
-    canvas.style.width = (288 * scale) + "px";
-    canvas.style.height = "auto";
+    const dispW = Math.round(pet.frame.width * scale);
+    const dispH = Math.round(pet.frame.height * scale);
+    canvas.style.width = dispW + "px";
+    canvas.style.height = dispH + "px";
+    try {
+      const w = window.__TAURI__ && window.__TAURI__.window;
+      const win = w && (w.getCurrentWindow || w.getCurrent) ? (w.getCurrentWindow || w.getCurrent).call(w) : null;
+      if (win && win.setSize) win.setSize({ width: dispW, height: dispH });
+    } catch (_) {}
     ctx.imageSmoothingEnabled = false;
     frameIdx = 0; acc = 0;
     activeKey = petKey(p);
