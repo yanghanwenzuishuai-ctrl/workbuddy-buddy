@@ -217,12 +217,11 @@ async function loadPetDesc(p) {
     });
     pet = meta; sheet = img;
     canvas.width = pet.frame.width; canvas.height = pet.frame.height;
-    // Optional per-pet display scale (default 1). Shrink the canvas AND the
-    // window together so a compact pet takes minimal screen space and its
-    // transparent margins don't block clicks on what's behind.
-    const scale = Number(meta.displayScale) || 1;
-    const dispW = Math.round(pet.frame.width * scale);
-    const dispH = Math.round(pet.frame.height * scale);
+    // Keep the sprite at its default 288px-wide display size, but shrink the
+    // native window to hug the canvas so the transparent margins around the
+    // pet no longer intercept clicks on what's behind it.
+    const dispW = Math.round(pet.frame.width * 1.5);   // 192 -> 288
+    const dispH = Math.round(pet.frame.height * 1.5);  // 208 -> 312
     canvas.style.width = dispW + "px";
     canvas.style.height = dispH + "px";
     try {
