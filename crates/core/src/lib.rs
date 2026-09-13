@@ -311,11 +311,12 @@ impl Machine {
             HookKind::PostToolUse { .. } => Some((DisplayState::Working, ActivityState::Active)),
             HookKind::PermissionRequest => Some((DisplayState::Waiting, ActivityState::Waiting)),
             HookKind::Notification { kind } => classify_notification(kind.as_deref()),
-            HookKind::Stop { ends_with_question } => Some(if *ends_with_question {
-                (DisplayState::Waiting, ActivityState::Waiting)
-            } else {
-                (DisplayState::Done, ActivityState::EligibleIdle)
-            }),
+            // WorkBuddy emits Stop after every assistant reply; there is no
+            // reliable "task finished" signal. The heuristic question flag
+            // misfires on common AI closers ("need anything else?"), so every
+            // Stop lands on Done. Waiting is still reached via
+            // PermissionRequest / idle_prompt notifications.
+            HookKind::Stop { .. } => Some((DisplayState::Done, ActivityState::EligibleIdle)),
         };
 
         if let Some((display_state, activity_state)) = next {
@@ -645,7 +646,11 @@ mod tests {
     }
 
     #[test]
-    fn stop_with_question_waits_not_done() {
+    fn stop_with_question_still_goes_done() {
+        // The question heuristic is intentionally ignored: WorkBuddy's Stop
+        // fires after every reply, and AI closers often end with a question,
+        // so we land on Done regardless. Waiting is driven by
+        // PermissionRequest / idle_prompt instead.
         let mut m = Machine::new();
         m.apply(&ev(
             "s1",
@@ -654,7 +659,7 @@ mod tests {
                 ends_with_question: true,
             },
         ));
-        assert_eq!(m.display_state(0), State::Waiting);
+        assert_eq!(m.display_state(0), State::Done);
     }
 
     #[test]
@@ -1057,13 +1062,6 @@ mod tests {
             ),
             (
                 HookKind::PermissionRequest,
-                DisplayState::Waiting,
-                ActivityState::Waiting,
-            ),
-            (
-                HookKind::Stop {
-                    ends_with_question: true,
-                },
                 DisplayState::Waiting,
                 ActivityState::Waiting,
             ),
