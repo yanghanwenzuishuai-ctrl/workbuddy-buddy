@@ -28,7 +28,7 @@ use tauri::{
 const POLL_MS: u64 = 50;
 const SAFE_MARGIN_LOGICAL: f64 = 16.0;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Rect {
     x: f64,
     y: f64,

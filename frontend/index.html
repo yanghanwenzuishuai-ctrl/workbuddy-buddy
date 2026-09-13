@@ -213,6 +213,10 @@ async function loadPetDesc(p) {
     await new Promise((res, rej) => {
       img.onload = res;
       img.onerror = () => rej(new Error("spritesheet failed: " + base + meta.spritesheetPath));
+      // Required so a cross-origin user pet sheet (served from 127.0.0.1:8792)
+      // does not taint the canvas; otherwise getImageData() (the click-through
+      // silhouette) throws and the whole window stops passing clicks through.
+      img.crossOrigin = "anonymous";
       img.src = base + meta.spritesheetPath;
     });
     pet = meta; sheet = img;
